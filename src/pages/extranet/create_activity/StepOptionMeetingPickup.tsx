@@ -6,6 +6,7 @@ import OptionSetupLayout from '../../../components/OptionSetupLayout';
 import { useAppSelector } from '../../../redux/store';
 import GoogleMapsModal from '../../../components/GoogleMapsModal';
 import { placesApi, Place } from '../../../api/places';
+import { transportModesApi, TransportMode } from '../../../api/transportModes';
 
 interface MeetingPickupData {
   arrivalMethod: 'meetingPoint' | 'pickupService';
@@ -20,6 +21,7 @@ interface MeetingPickupData {
   originCity: string;
   meetingPointAddress: string; // Nuevo: dirección del punto de encuentro
   customPickupTiming: string; // Nuevo: timing personalizado
+  pickupServiceDescription: string; // Nuevo: descripción del servicio de recogida
 }
 
 export default function StepOptionMeetingPickup() {
@@ -40,7 +42,8 @@ export default function StepOptionMeetingPickup() {
     transportMode: 'car',
     originCity: 'lima', // Ciudad de origen por defecto
     meetingPointAddress: '', // Dirección del punto de encuentro
-    customPickupTiming: '' // Timing personalizado
+    customPickupTiming: '', // Timing personalizado
+    pickupServiceDescription: '' // Descripción del servicio de recogida
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +58,11 @@ export default function StepOptionMeetingPickup() {
   const [availableCities, setAvailableCities] = useState<Place[]>([]);
   const [isLoadingCities, setIsLoadingCities] = useState(true);
   const [citiesError, setCitiesError] = useState<string | null>(null);
+
+  // Estado para los modos de transporte disponibles desde la API
+  const [availableTransportModes, setAvailableTransportModes] = useState<TransportMode[]>([]);
+  const [isLoadingTransportModes, setIsLoadingTransportModes] = useState(true);
+  const [transportModesError, setTransportModesError] = useState<string | null>(null);
 
   const optionId = searchParams.get('optionId');
   const storageKey = `meetingPickup_${optionId || 'default'}`;
@@ -115,6 +123,32 @@ export default function StepOptionMeetingPickup() {
 
     fetchCities();
   }, [formData.originCity]);
+
+  // Cargar modos de transporte disponibles desde la API
+  useEffect(() => {
+    const fetchTransportModes = async () => {
+      try {
+        setIsLoadingTransportModes(true);
+        setTransportModesError(null);
+        const response = await transportModesApi.getTransportModes({ lang: language });
+        setAvailableTransportModes(response.data);
+        
+        // Si no hay modo de transporte seleccionado o el seleccionado no existe en la lista, seleccionar el primero
+        if (!formData.transportMode || !response.data.find(mode => mode.name.toLowerCase() === formData.transportMode)) {
+          if (response.data.length > 0) {
+            setFormData(prev => ({ ...prev, transportMode: response.data[0].name.toLowerCase() }));
+          }
+        }
+      } catch (error) {
+        console.error('Error al cargar modos de transporte:', error);
+        setTransportModesError('Error al cargar los modos de transporte disponibles. Por favor, recarga la página.');
+      } finally {
+        setIsLoadingTransportModes(false);
+      }
+    };
+
+    fetchTransportModes();
+  }, [language, formData.transportMode]);
 
   const handleAddAddress = () => {
     if (newAddress.trim() && !formData.pickupAddresses.includes(newAddress.trim())) {
@@ -491,6 +525,30 @@ export default function StepOptionMeetingPickup() {
                         </small>
                       </div>
                     )}
+
+                    {/* Descripción del servicio de recogida - Solo visible si hay punto de encuentro */}
+                    <div className="mt-4">
+                      <h6 className="fw-bold mb-3">
+                        {getTranslation('stepMeetingPickup.pickupServiceDescription.title', language)}
+                        <span className="text-muted ms-2">({getTranslation('stepMeetingPickup.pickupServiceDescription.optional', language)})</span>
+                      </h6>
+                      <p className="text-muted mb-3">
+                        {getTranslation('stepMeetingPickup.pickupServiceDescription.description', language)}
+                      </p>
+                      <textarea
+                        className="form-control"
+                        rows={4}
+                        value={formData.pickupServiceDescription}
+                        onChange={(e) => setFormData({...formData, pickupServiceDescription: e.target.value})}
+                        placeholder={getTranslation('stepMeetingPickup.pickupServiceDescription.placeholder', language)}
+                        maxLength={500}
+                      />
+                      <div className="text-end mt-2">
+                        <small className="text-muted">
+                          {formData.pickupServiceDescription.length} / 500
+                        </small>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -793,23 +851,57 @@ export default function StepOptionMeetingPickup() {
                     <p className="text-muted mb-3">
                       {getTranslation('stepMeetingPickup.transport.description', language)}
                     </p>
-                    <select
-                      className="form-select"
-                      value={formData.transportMode}
-                      onChange={(e) => setFormData({...formData, transportMode: e.target.value})}
-                    >
-                      <option value="car">{getTranslation('stepMeetingPickup.transport.car', language)}</option>
-                      <option value="van">{getTranslation('stepMeetingPickup.transport.van', language)}</option>
-                      <option value="bus">{getTranslation('stepMeetingPickup.transport.bus', language)}</option>
-                      <option value="minibus">{getTranslation('stepMeetingPickup.transport.minibus', language)}</option>
-                      <option value="motorcycle">{getTranslation('stepMeetingPickup.transport.motorcycle', language)}</option>
-                      <option value="bicycle">{getTranslation('stepMeetingPickup.transport.bicycle', language)}</option>
-                      <option value="walking">{getTranslation('stepMeetingPickup.transport.walking', language)}</option>
-                      <option value="other">{getTranslation('stepMeetingPickup.transport.other', language)}</option>
-                    </select>
+                    {isLoadingTransportModes ? (
+                      <div className="d-flex align-items-center">
+                        <div className="spinner-border spinner-border-sm me-2" role="status">
+                          <span className="visually-hidden">{getTranslation('stepMeetingPickup.transport.loading', language)}</span>
+                        </div>
+                        <span className="text-muted">{getTranslation('stepMeetingPickup.transport.loading', language)}</span>
+                      </div>
+                    ) : transportModesError ? (
+                      <div className="alert alert-danger">
+                        <i className="fas fa-exclamation-triangle me-2"></i>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span>{getTranslation('stepMeetingPickup.transport.error', language)}</span>
+                          <button 
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => {
+                              setTransportModesError(null);
+                              setIsLoadingTransportModes(true);
+                              transportModesApi.getTransportModes({ lang: language })
+                                .then(response => {
+                                  setAvailableTransportModes(response.data);
+                                  if (response.data.length > 0 && (!formData.transportMode || !response.data.find(mode => mode.name.toLowerCase() === formData.transportMode))) {
+                                    setFormData(prev => ({ ...prev, transportMode: response.data[0].name.toLowerCase() }));
+                                  }
+                                })
+                                .catch(error => {
+                                  console.error('Error al reintentar cargar modos de transporte:', error);
+                                  setTransportModesError('Error al cargar los modos de transporte disponibles. Por favor, recarga la página.');
+                                })
+                                .finally(() => setIsLoadingTransportModes(false));
+                            }}
+                          >
+                            <i className="fas fa-redo me-1"></i>
+                            {getTranslation('stepMeetingPickup.transport.retry', language)}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        className="form-select"
+                        value={formData.transportMode}
+                        onChange={(e) => setFormData({...formData, transportMode: e.target.value})}
+                      >
+                        {availableTransportModes.map((mode) => (
+                          <option key={mode.id} value={mode.name.toLowerCase()}>
+                            {mode.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
-
                 {/* Botones de navegación */}
                 <div className="d-flex justify-content-between mt-5">
                   <button 

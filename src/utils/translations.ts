@@ -1486,6 +1486,9 @@ export const translations: Translations = {
   'stepMeetingPickup.transport.bicycle': { es: 'Bicicleta', en: 'Bicycle' },
   'stepMeetingPickup.transport.walking': { es: 'A pie', en: 'Walking' },
   'stepMeetingPickup.transport.other': { es: 'Otro', en: 'Other' },
+  'stepMeetingPickup.transport.loading': { es: 'Cargando modos de transporte...', en: 'Loading transport modes...' },
+  'stepMeetingPickup.transport.error': { es: 'Error al cargar los modos de transporte disponibles. Por favor, recarga la página.', en: 'Error loading available transport modes. Please reload the page.' },
+  'stepMeetingPickup.transport.retry': { es: 'Reintentar', en: 'Retry' },
   'stepMeetingPickup.validation.meetingPoint': { es: 'Debes añadir la dirección del punto de encuentro.', en: 'You must add the meeting point address.' },
   'stepMeetingPickup.validation.pickupAddresses': { es: 'Debes añadir al menos una dirección o zona de recogida.', en: 'You must add at least one pickup address or zone.' },
   'stepMeetingPickup.validation.customPickupTiming': { es: 'Debes especificar el horario personalizado de recogida.', en: 'You must specify the custom pickup timing.' },
@@ -1508,6 +1511,11 @@ export const translations: Translations = {
   'stepMeetingPickup.originCity.error': { es: 'Error al cargar las ciudades disponibles. Por favor, recarga la página.', en: 'Error loading available cities. Please reload the page.' },
   'stepMeetingPickup.meetingPoint.current': { es: 'Punto de encuentro:', en: 'Meeting point:' },
 
+  // Traducciones para descripción del servicio de recogida (punto de encuentro)
+  'stepMeetingPickup.pickupServiceDescription.title': { es: 'Describe tu servicio de recogida', en: 'Describe your pickup service' },
+  'stepMeetingPickup.pickupServiceDescription.optional': { es: 'opcional', en: 'optional' },
+  'stepMeetingPickup.pickupServiceDescription.description': { es: 'Si tus zonas/lugares de recogida son muy específicos, descríbelos con más detalle.', en: 'If your pickup zones/places are very specific, describe them in more detail.' },
+  'stepMeetingPickup.pickupServiceDescription.placeholder': { es: 'Describe los detalles del servicio de recogida...', en: 'Describe the details of the pickup service...' },
 
   'stepMeetingPickup.pickupDescription.optional': { es: 'Describe tu servicio de recogida (opcional)', en: 'Describe your pickup service (optional)' },
   'stepMeetingPickup.pickupDescription.placeholder': { es: 'Describe los detalles del servicio de recogida...', en: 'Describe the details of the pickup service...' },
