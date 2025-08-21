@@ -29,6 +29,7 @@ import StepOptions from '../pages/extranet/create_activity/StepOptions';
 import StepItinerary from '../pages/extranet/create_activity/StepItinerary';
 import StepOptionSetup from '../pages/extranet/create_activity/StepOptionSetup';
 import StepOptionMeetingPickup from '../pages/extranet/create_activity/StepOptionMeetingPickup';
+import StepOptionAvailabilityPrice from '../pages/extranet/create_activity/StepOptionAvailabilityPrice';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -68,6 +69,7 @@ const AppRoutes: React.FC = () => {
         <Route path="activity/createItinerary" element={<StepItinerary />} />
         <Route path="activity/createOptionSetup" element={<StepOptionSetup />} />
         <Route path="activity/createOptionMeetingPickup" element={<StepOptionMeetingPickup />} />
+        <Route path="activity/availabilityPricing" element={<StepOptionAvailabilityPrice />} />
       </Route>
     </Routes>
   );

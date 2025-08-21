@@ -7,11 +7,13 @@ import { useAppSelector } from '../../../redux/store';
 import GoogleMapsModal from '../../../components/GoogleMapsModal';
 import { placesApi, Place } from '../../../api/places';
 import { transportModesApi, TransportMode } from '../../../api/transportModes';
+import { bookingOptionApi, CreateBookingOptionMeetingPickupRequest } from '../../../api/bookingOption';
 
 interface MeetingPickupData {
   arrivalMethod: 'meetingPoint' | 'pickupService';
   pickupType: 'zones' | 'specificPlaces';
   pickupAddresses: string[];
+  pickupAddressNotes: string[]; // Nuevo: notas para cada dirección de pickup
   pickupDescription: string;
   pickupTimeCommunication: 'activityStart' | 'dayBefore' | 'within24h';
   pickupTiming: string;
@@ -20,8 +22,10 @@ interface MeetingPickupData {
   transportMode: string;
   originCity: string;
   meetingPointAddress: string; // Nuevo: dirección del punto de encuentro
+  meetingPointLatitude: number; // Nuevo: latitud del punto de encuentro
+  meetingPointLongitude: number; // Nuevo: longitud del punto de encuentro
   customPickupTiming: string; // Nuevo: timing personalizado
-  pickupServiceDescription: string; // Nuevo: descripción del servicio de recogida
+  meetingPointDescription: string; // Descripción del punto de encuentro
 }
 
 export default function StepOptionMeetingPickup() {
@@ -34,6 +38,7 @@ export default function StepOptionMeetingPickup() {
     arrivalMethod: 'meetingPoint',
     pickupType: 'zones',
     pickupAddresses: [],
+    pickupAddressNotes: [], // Inicializar con un array vacío
     pickupDescription: '',
     pickupTimeCommunication: 'dayBefore',
     pickupTiming: '0-30',
@@ -42,8 +47,10 @@ export default function StepOptionMeetingPickup() {
     transportMode: 'car',
     originCity: 'lima', // Ciudad de origen por defecto
     meetingPointAddress: '', // Dirección del punto de encuentro
+    meetingPointLatitude: 0, // Latitud del punto de encuentro
+    meetingPointLongitude: 0, // Longitud del punto de encuentro
     customPickupTiming: '', // Timing personalizado
-    pickupServiceDescription: '' // Descripción del servicio de recogida
+    meetingPointDescription: '' // Descripción del punto de encuentro
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +60,11 @@ export default function StepOptionMeetingPickup() {
   const [modalLocationType, setModalLocationType] = useState<'address' | 'zone'>('address');
   const [showReturnGoogleMapsModal, setShowReturnGoogleMapsModal] = useState(false);
   const [showMeetingPointGoogleMapsModal, setShowMeetingPointGoogleMapsModal] = useState(false);
+  
+  // Estado para el modal de notas de direcciones
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(-1);
+  const [currentNoteText, setCurrentNoteText] = useState<string>('');
   
   // Estado para las ciudades disponibles desde la API
   const [availableCities, setAvailableCities] = useState<Place[]>([]);
@@ -150,21 +162,53 @@ export default function StepOptionMeetingPickup() {
     fetchTransportModes();
   }, [language, formData.transportMode]);
 
-  const handleAddAddress = () => {
-    if (newAddress.trim() && !formData.pickupAddresses.includes(newAddress.trim())) {
+  const handleAddAddress = (address: string) => {
+    if (address.trim() && !formData.pickupAddresses.includes(address.trim())) {
       setFormData(prev => ({
         ...prev,
-        pickupAddresses: [...prev.pickupAddresses, newAddress.trim()]
+        pickupAddresses: [...prev.pickupAddresses, address.trim()],
+        pickupAddressNotes: [...prev.pickupAddressNotes, ''] // Inicializar nota vacía
       }));
-      setNewAddress('');
     }
   };
 
   const handleRemoveAddress = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      pickupAddresses: prev.pickupAddresses.filter((_, i) => i !== index)
-    }));
+    const newAddresses = formData.pickupAddresses.filter((_, i) => i !== index);
+    const newNotes = formData.pickupAddressNotes.filter((_, i) => i !== index);
+    setFormData({
+      ...formData,
+      pickupAddresses: newAddresses,
+      pickupAddressNotes: newNotes
+    });
+  };
+
+  // Función para abrir el modal de notas
+  const handleOpenNotesModal = (index: number) => {
+    setCurrentNoteIndex(index);
+    setCurrentNoteText(formData.pickupAddressNotes[index] || '');
+    setShowNotesModal(true);
+  };
+
+  // Función para guardar la nota
+  const handleSaveNote = () => {
+    if (currentNoteIndex >= 0) {
+      const newNotes = [...formData.pickupAddressNotes];
+      newNotes[currentNoteIndex] = currentNoteText;
+      setFormData({
+        ...formData,
+        pickupAddressNotes: newNotes
+      });
+    }
+    setShowNotesModal(false);
+    setCurrentNoteIndex(-1);
+    setCurrentNoteText('');
+  };
+
+  // Función para cerrar el modal de notas
+  const handleCloseNotesModal = () => {
+    setShowNotesModal(false);
+    setCurrentNoteIndex(-1);
+    setCurrentNoteText('');
   };
 
   const handleAddReturnAddress = () => {
@@ -245,11 +289,13 @@ export default function StepOptionMeetingPickup() {
     
     setFormData(prev => ({
       ...prev,
-      meetingPointAddress: locationText
+      meetingPointAddress: locationText,
+      meetingPointLatitude: location.lat,
+      meetingPointLongitude: location.lng
     }));
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (isSubmitting) return;
     
     // Validar campos obligatorios
@@ -285,10 +331,124 @@ export default function StepOptionMeetingPickup() {
     
     setIsSubmitting(true);
     
-    setTimeout(() => {
-      console.log('StepOptionMeetingPickup: Datos mantenidos en localStorage para siguientes pasos');
-      navigate('/extranet/activity/availabilityPricing');
-    }, 500);
+    try {
+      // Preparar datos para la API
+      const apiRequest: CreateBookingOptionMeetingPickupRequest = {
+        activityId: activityId!,
+        bookingOptionId: optionId!,
+        lang: language,
+        meetingType: formData.arrivalMethod === 'meetingPoint' ? 'MEETING_POINT' : 'REFERENCE_CITY_WITH_LIST',
+        
+        // Meeting Point
+        meetingPointId: formData.arrivalMethod === 'meetingPoint' ? 
+          availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id || undefined : undefined,
+        meetingPointAddress: formData.arrivalMethod === 'meetingPoint' ? formData.meetingPointAddress || undefined : undefined,
+        meetingPointDescription: formData.arrivalMethod === 'meetingPoint' ? formData.meetingPointDescription || undefined : 
+                                 formData.arrivalMethod === 'pickupService' ? formData.pickupDescription || undefined : undefined,
+        meetingPointLatitude: formData.arrivalMethod === 'meetingPoint' ? formData.meetingPointLatitude : undefined,
+        meetingPointLongitude: formData.arrivalMethod === 'meetingPoint' ? formData.meetingPointLongitude : undefined,
+        
+        // Pickup Points (solo si es pickup service - REFERENCE_CITY_WITH_LIST)
+        pickupPoints: formData.arrivalMethod === 'pickupService' ? formData.pickupAddresses.map((address, index) => {
+          // Extraer coordenadas del formato "address (lat, lng)"
+          const coordsMatch = address.match(/\(([-\d.]+),\s*([-\d.]+)\)/);
+          const lat = coordsMatch ? parseFloat(coordsMatch[1]) : 0;
+          const lng = coordsMatch ? parseFloat(coordsMatch[2]) : 0;
+          
+          // Extraer nombre del lugar si existe
+          const nameMatch = address.match(/^([^-]+)/);
+          const name = nameMatch ? nameMatch[1].trim() : `Punto de recogida ${index + 1}`;
+          
+          // Limpiar dirección (mantener la dirección completa guardada)
+          const cleanAddress = address.replace(/^[^-]+-\s*/, '').replace(/\s*\([-\d.,\s]+\)$/, '');
+          
+          return {
+            cityId: availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id || 0,
+            name: name,
+            address: cleanAddress, // Dirección guardada en el grupo
+            latitude: lat,
+            longitude: lng,
+            notes: formData.pickupAddressNotes[index] || '' // Usar notas de la lista
+          };
+        }) : undefined,
+        
+        // Pickup Config
+        pickupNotificationWhen: formData.pickupTimeCommunication === 'activityStart' ? 'AT_START_TIME' :
+                               formData.pickupTimeCommunication === 'dayBefore' ? 'DAY_BEFORE' : '24H_BEFORE',
+        pickupTimeOption: formData.pickupTiming === '0-30' ? '30_MIN_BEFORE' :
+                         formData.pickupTiming === '30-60' ? '60_MIN_BEFORE' :
+                         formData.pickupTiming === '60-90' ? '90_MIN_BEFORE' :
+                         formData.pickupTiming === '90-120' ? '120_MIN_BEFORE' :
+                         formData.pickupTiming === 'custom' ? 'CUSTOM' : 'SAME_AS_START',
+        customPickupMinutes: formData.pickupTiming === 'custom' ? parseInt(formData.customPickupTiming) || 0 : undefined,
+        
+        // Dropoff Config
+        dropoffType: formData.returnLocation === 'samePickup' ? 'SAME_AS_PICKUP' :
+                    formData.returnLocation === 'otherLocation' ? 'DIFFERENT_LOCATION' : 'NO_DROPOFF',
+        
+        // Transport
+        transportModeId: formData.arrivalMethod === 'pickupService' ? 
+          availableTransportModes.find(mode => mode.name.toLowerCase() === formData.transportMode)?.id || undefined : undefined
+      };
+
+      console.log('StepOptionMeetingPickup: Enviando datos a la API:', apiRequest);
+      
+      // Verificar datos del Meeting Point
+      if (formData.arrivalMethod === 'meetingPoint') {
+        console.log('StepOptionMeetingPickup: Datos del Meeting Point:', {
+          meetingPointId: availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id,
+          meetingPointAddress: formData.meetingPointAddress,
+          meetingPointDescription: formData.meetingPointDescription,
+          meetingPointLatitude: formData.meetingPointLatitude,
+          meetingPointLongitude: formData.meetingPointLongitude
+        });
+      }
+      
+      // Verificar datos de Pickup Points
+      if (formData.arrivalMethod === 'pickupService') {
+        console.log('StepOptionMeetingPickup: Datos de Pickup Points (REFERENCE_CITY_WITH_LIST):', {
+          meetingPointDescription: formData.pickupDescription, // Descripción para REFERENCE_CITY_WITH_LIST
+          pickupPoints: formData.pickupAddresses.map((address, index) => {
+            const coordsMatch = address.match(/\(([-\d.]+),\s*([-\d.]+)\)/);
+            const lat = coordsMatch ? parseFloat(coordsMatch[1]) : 0;
+            const lng = coordsMatch ? parseFloat(coordsMatch[2]) : 0;
+            const nameMatch = address.match(/^([^-]+)/);
+            const name = nameMatch ? nameMatch[1].trim() : `Punto de recogida ${index + 1}`;
+            const cleanAddress = address.replace(/^[^-]+-\s*/, '').replace(/\s*\([-\d.,\s]+\)$/, '');
+            
+            return {
+              cityId: availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id || 0,
+              name: name,
+              address: cleanAddress,
+              latitude: lat,
+              longitude: lng,
+              notes: formData.pickupAddressNotes[index] || '' // Usar notas de la lista
+            };
+          })
+        });
+      }
+      
+      // Consumir la API
+      const response = await bookingOptionApi.createBookingOptionMeetingPickup(apiRequest);
+      
+      if (response.success) {
+        console.log('StepOptionMeetingPickup: API consumida exitosamente:', response);
+        
+        // Guardar el ID creado en localStorage para uso posterior
+        localStorage.setItem(`meetingPickupId_${optionId}`, response.idCreated);
+        
+        // Navegar a la siguiente página
+        navigate('/extranet/activity/availabilityPricing');
+      } else {
+        console.error('StepOptionMeetingPickup: Error en la API:', response.message);
+        alert(`Error al guardar la configuración: ${response.message}`);
+        setIsSubmitting(false);
+      }
+    } catch (error) {
+      console.error('StepOptionMeetingPickup: Error al consumir la API:', error);
+      alert('Error inesperado al guardar la configuración. Por favor, inténtalo de nuevo.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleBack = () => {
@@ -505,7 +665,7 @@ export default function StepOptionMeetingPickup() {
                           <button
                             type="button"
                             className="btn btn-sm btn-outline-danger ms-2"
-                            onClick={() => setFormData(prev => ({ ...prev, meetingPointAddress: '' }))}
+                            onClick={() => setFormData(prev => ({ ...prev, meetingPointAddress: '', meetingPointLatitude: 0, meetingPointLongitude: 0 }))}
                           >
                             <i className="fas fa-times"></i>
                           </button>
@@ -526,26 +686,34 @@ export default function StepOptionMeetingPickup() {
                       </div>
                     )}
 
-                    {/* Descripción del servicio de recogida - Solo visible si hay punto de encuentro */}
+                    {/* Descripción del punto de encuentro - Solo visible si hay punto de encuentro */}
                     <div className="mt-4">
                       <h6 className="fw-bold mb-3">
-                        {getTranslation('stepMeetingPickup.pickupServiceDescription.title', language)}
-                        <span className="text-muted ms-2">({getTranslation('stepMeetingPickup.pickupServiceDescription.optional', language)})</span>
+                        {getTranslation('stepMeetingPickup.meetingPointDescription.title', language)}
+                        <span className="text-muted ms-2">({getTranslation('stepMeetingPickup.meetingPointDescription.optional', language)})</span>
                       </h6>
-                      <p className="text-muted mb-3">
-                        {getTranslation('stepMeetingPickup.pickupServiceDescription.description', language)}
-                      </p>
+                      
+                      {/* Preguntas guía */}
+                      <div className="mb-3">
+                        <p className="text-muted mb-2">
+                          {getTranslation('stepMeetingPickup.meetingPointDescription.question1', language)}
+                        </p>
+                        <p className="text-muted mb-3">
+                          {getTranslation('stepMeetingPickup.meetingPointDescription.question2', language)}
+                        </p>
+                      </div>
+                      
                       <textarea
                         className="form-control"
                         rows={4}
-                        value={formData.pickupServiceDescription}
-                        onChange={(e) => setFormData({...formData, pickupServiceDescription: e.target.value})}
-                        placeholder={getTranslation('stepMeetingPickup.pickupServiceDescription.placeholder', language)}
-                        maxLength={500}
+                        value={formData.meetingPointDescription}
+                        onChange={(e) => setFormData({...formData, meetingPointDescription: e.target.value})}
+                        placeholder={getTranslation('stepMeetingPickup.meetingPointDescription.placeholder', language)}
+                        maxLength={1000}
                       />
                       <div className="text-end mt-2">
                         <small className="text-muted">
-                          {formData.pickupServiceDescription.length} / 500
+                          {formData.meetingPointDescription.length} / 1000
                         </small>
                       </div>
                     </div>
@@ -623,6 +791,17 @@ export default function StepOptionMeetingPickup() {
                           {formData.pickupAddresses.map((address, index) => (
                             <div key={index} className="d-flex align-items-center gap-2 mb-2">
                               <span className="badge bg-light text-dark">{address}</span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-info"
+                                onClick={() => handleOpenNotesModal(index)}
+                                title={getTranslation('stepMeetingPickup.notes.button', language)}
+                              >
+                                <i className="fas fa-sticky-note"></i>
+                                {formData.pickupAddressNotes[index] && (
+                                  <span className="ms-1 text-success">✓</span>
+                                )}
+                              </button>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-outline-danger"
@@ -962,6 +1141,60 @@ export default function StepOptionMeetingPickup() {
         locationType="address"
         cityCoordinates={getCityCoordinates()}
       />
+
+      {/* Modal de notas para direcciones */}
+      {showNotesModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  {getTranslation('stepMeetingPickup.notes.modal.title', language)}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseNotesModal}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-muted mb-3">
+                  {getTranslation('stepMeetingPickup.notes.modal.description', language)}
+                </p>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={currentNoteText}
+                  onChange={(e) => setCurrentNoteText(e.target.value)}
+                  placeholder={getTranslation('stepMeetingPickup.notes.modal.placeholder', language)}
+                  maxLength={500}
+                />
+                <div className="text-end mt-2">
+                  <small className="text-muted">
+                    {currentNoteText.length} / 500
+                  </small>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseNotesModal}
+                >
+                  {getTranslation('stepMeetingPickup.notes.modal.cancel', language)}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSaveNote}
+                >
+                  {getTranslation('stepMeetingPickup.notes.modal.save', language)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </OptionSetupLayout>
   );
 } 

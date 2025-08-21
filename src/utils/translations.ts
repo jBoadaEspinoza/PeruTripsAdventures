@@ -1447,7 +1447,7 @@ export const translations: Translations = {
   'stepMeetingPickup.title': { es: 'Encuentro o recogida', en: 'Meeting or pickup' },
   'stepMeetingPickup.description': { es: 'Configura cómo los clientes llegarán a tu actividad', en: 'Configure how clients will arrive at your activity' },
   'stepMeetingPickup.arrivalMethod.title': { es: 'Método de llegada', en: 'Arrival method' },
-  'stepMeetingPickup.arrivalMethod.description': { es: '¿Cómo llegan los clientes a la actividad?', en: 'How do clients arrive at the activity?' },
+  'stepMeetingPickup.arrivalMethod.description': { es: 'Describe el punto de encuentro (opcional)', en: 'Describe the meeting point (optional)' },
   'stepMeetingPickup.arrivalMethod.meetingPoint': { es: 'Punto de encuentro', en: 'Meeting point' },
   'stepMeetingPickup.arrivalMethod.pickupService': { es: 'Servicio de recogida', en: 'Pickup service' },
   'stepMeetingPickup.meetingPoint.title': { es: 'Punto de encuentro', en: 'Meeting point' },
@@ -1516,6 +1516,13 @@ export const translations: Translations = {
   'stepMeetingPickup.pickupServiceDescription.optional': { es: 'opcional', en: 'optional' },
   'stepMeetingPickup.pickupServiceDescription.description': { es: 'Si tus zonas/lugares de recogida son muy específicos, descríbelos con más detalle.', en: 'If your pickup zones/places are very specific, describe them in more detail.' },
   'stepMeetingPickup.pickupServiceDescription.placeholder': { es: 'Describe los detalles del servicio de recogida...', en: 'Describe the details of the pickup service...' },
+  
+  // Nuevas traducciones para la descripción del punto de encuentro
+  'stepMeetingPickup.meetingPointDescription.title': { es: 'Describe el punto de encuentro', en: 'Describe the meeting point' },
+  'stepMeetingPickup.meetingPointDescription.optional': { es: 'opcional', en: 'optional' },
+  'stepMeetingPickup.meetingPointDescription.question1': { es: '¿Hay que fijarse en algún punto concreto?', en: 'Is there a specific point to look out for?' },
+  'stepMeetingPickup.meetingPointDescription.question2': { es: '¿Cómo reconocerán los clientes al guía?', en: 'How will clients recognize the guide?' },
+  'stepMeetingPickup.meetingPointDescription.placeholder': { es: 'Please insert your text in English', en: 'Please insert your text in English' },
 
   'stepMeetingPickup.pickupDescription.optional': { es: 'Describe tu servicio de recogida (opcional)', en: 'Describe your pickup service (optional)' },
   'stepMeetingPickup.pickupDescription.placeholder': { es: 'Describe los detalles del servicio de recogida...', en: 'Describe the details of the pickup service...' },
@@ -1540,8 +1547,6 @@ export const translations: Translations = {
 
 
 
-  // Traducción para el texto de ayuda del punto de encuentro
-  'stepMeetingPickup.meetingPoint.help': { es: 'Selecciona la ubicación exacta donde los clientes deben reunirse para comenzar la actividad.', en: 'Select the exact location where clients should meet to start the activity.' },
   'googleMaps.search.zoneInfo': { es: 'Buscando zonas, barrios y áreas generales', en: 'Searching for zones, neighborhoods and general areas' },
   'googleMaps.search.addressInfo': { es: 'Buscando direcciones y lugares específicos', en: 'Searching for specific addresses and places' },
 
@@ -1552,7 +1557,29 @@ export const translations: Translations = {
   'stepMeetingPickup.pickupType.specificPlaces.addMessage': { es: 'Añade al menos 2 direcciones donde ofreces el servicio de recogida', en: 'Add at least 2 addresses where you offer pickup service' },
   'stepMeetingPickup.pickupType.zones.mapDescription': { es: 'Selecciona las zonas en el mapa donde ofreces el servicio de recogida.', en: 'Select the zones on the map where you offer pickup service.' },
   'stepMeetingPickup.pickupType.zones.added': { es: 'Zonas añadidas:', en: 'Added zones:' },
-  'stepMeetingPickup.pickupType.specificPlaces.added': { es: 'Direcciones añadidas:', en: 'Added addresses:' }
+  'stepMeetingPickup.pickupType.specificPlaces.added': { es: 'Direcciones añadidas:', en: 'Added addresses:' },
+
+  // Step Availability Pricing
+  'stepAvailabilityPricing.title': { es: 'Disponibilidad y precios', en: 'Availability and pricing' },
+  'stepAvailabilityPricing.buttons.back': { es: 'Regresar', en: 'Back' },
+  'stepAvailabilityPricing.buttons.continue': { es: 'Continuar', en: 'Continue' },
+
+  'stepMeetingPickup.meetingPoint.help': { es: 'Selecciona la ubicación exacta donde los clientes deben reunirse para comenzar la actividad.', en: 'Select the exact location where clients should meet to start the activity.' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.title': { es: '¿Dónde operará el punto de encuentro?', en: 'Where will the meeting point operate?' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.description': { es: 'Selecciona la ubicación donde operará tu punto de encuentro.', en: 'Select the location where your meeting point will operate.' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.label': { es: 'Ubicación de operación', en: 'Operating location' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.select': { es: 'Selecciona una ubicación', en: 'Select a location' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.option1': { es: 'Centro de Lima', en: 'Lima Center' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.option2': { es: 'Miraflores', en: 'Miraflores' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.option3': { es: 'Barranco', en: 'Barranco' },
+  'stepMeetingPickup.meetingPoint.operatingLocation.help': { es: 'Esta ubicación determina dónde operará tu punto de encuentro.', en: 'This location determines where your meeting point will operate.' },
+
+  'stepMeetingPickup.notes.modal.save': { es: 'Guardar', en: 'Save' },
+  'stepMeetingPickup.notes.modal.cancel': { es: 'Cancelar', en: 'Cancel' },
+  'stepMeetingPickup.notes.modal.placeholder': { es: 'Escribe una nota específica para esta dirección...', en: 'Write a specific note for this address...' },
+  'stepMeetingPickup.notes.modal.description': { es: 'Agrega información adicional específica para esta dirección de recogida.', en: 'Add additional information specific to this pickup address.' },
+  'stepMeetingPickup.notes.modal.title': { es: 'Nota para la dirección', en: 'Note for address' },
+  'stepMeetingPickup.notes.button': { es: 'Agregar/Editar nota', en: 'Add/Edit note' }
 };
 
 export const getTranslation = (key: string, language: 'es' | 'en'): string => {
