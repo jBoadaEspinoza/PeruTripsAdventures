@@ -438,7 +438,7 @@ export default function StepOptionMeetingPickup() {
         localStorage.setItem(`meetingPickupId_${optionId}`, response.idCreated);
         
         // Navegar a la siguiente página
-        navigate('/extranet/activity/availabilityPricing');
+        navigate(`/extranet/activity/availabilityPricing?optionId=${response.idCreated}`);
       } else {
         console.error('StepOptionMeetingPickup: Error en la API:', response.message);
         alert(`Error al guardar la configuración: ${response.message}`);
@@ -698,9 +698,9 @@ export default function StepOptionMeetingPickup() {
                         <p className="text-muted mb-2">
                           {getTranslation('stepMeetingPickup.meetingPointDescription.question1', language)}
                         </p>
-                        <p className="text-muted mb-3">
+                      <p className="text-muted mb-3">
                           {getTranslation('stepMeetingPickup.meetingPointDescription.question2', language)}
-                        </p>
+                      </p>
                       </div>
                       
                       <textarea

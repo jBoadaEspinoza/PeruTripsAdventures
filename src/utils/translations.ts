@@ -1561,8 +1561,26 @@ export const translations: Translations = {
 
   // Step Availability Pricing
   'stepAvailabilityPricing.title': { es: 'Disponibilidad y precios', en: 'Availability and pricing' },
+  'stepAvailabilityPricing.description': { es: 'Esto se aplicará a todos los horarios añadidos a esta opción.', en: 'This will apply to all schedules added to this option.' },
   'stepAvailabilityPricing.buttons.back': { es: 'Regresar', en: 'Back' },
   'stepAvailabilityPricing.buttons.continue': { es: 'Continuar', en: 'Continue' },
+  
+  // Disponibilidad
+  'stepAvailabilityPricing.availability.title': { es: '¿Cómo estableces tu disponibilidad?', en: 'How do you establish your availability?' },
+  'stepAvailabilityPricing.availability.timeSlots': { es: 'Franjas horarias', en: 'Time slots' },
+  'stepAvailabilityPricing.availability.timeSlots.example': { es: 'Ejemplo: tour guiado a pie a partir de las 09:00, las 10:00 y las 14:00', en: 'Example: guided walking tour starting at 09:00, 10:00 and 14:00' },
+  'stepAvailabilityPricing.availability.openingHours': { es: 'Horario de apertura', en: 'Opening hours' },
+  'stepAvailabilityPricing.availability.openingHours.example': { es: 'Ejemplo: museo abierto de lunes a sábado, entre las 09:00 y las 19:00', en: 'Example: museum open Monday to Saturday, between 09:00 and 19:00' },
+  
+  // Precios
+  'stepAvailabilityPricing.pricing.title': { es: '¿Cómo se fijan los precios?', en: 'How are prices set?' },
+  'stepAvailabilityPricing.pricing.perPerson': { es: 'Precio por persona', en: 'Price per person' },
+  'stepAvailabilityPricing.pricing.perPerson.description': { es: 'Establece precios diferentes para adultos, jóvenes, niños, etc.', en: 'Set different prices for adults, youth, children, etc.' },
+  'stepAvailabilityPricing.pricing.perGroup': { es: 'Precio por grupo/vehículo', en: 'Price per group/vehicle' },
+  'stepAvailabilityPricing.pricing.perGroup.description': { es: 'Establece precios diferentes según el tamaño del grupo, el tipo de vehículo, etc.', en: 'Set different prices according to group size, vehicle type, etc.' },
+  
+  // Botón añadir horario
+  'stepAvailabilityPricing.addSchedule': { es: 'Añadir nuevo horario', en: 'Add new schedule' },
 
   'stepMeetingPickup.meetingPoint.help': { es: 'Selecciona la ubicación exacta donde los clientes deben reunirse para comenzar la actividad.', en: 'Select the exact location where clients should meet to start the activity.' },
   'stepMeetingPickup.meetingPoint.operatingLocation.title': { es: '¿Dónde operará el punto de encuentro?', en: 'Where will the meeting point operate?' },
@@ -1579,7 +1597,30 @@ export const translations: Translations = {
   'stepMeetingPickup.notes.modal.placeholder': { es: 'Escribe una nota específica para esta dirección...', en: 'Write a specific note for this address...' },
   'stepMeetingPickup.notes.modal.description': { es: 'Agrega información adicional específica para esta dirección de recogida.', en: 'Add additional information specific to this pickup address.' },
   'stepMeetingPickup.notes.modal.title': { es: 'Nota para la dirección', en: 'Note for address' },
-  'stepMeetingPickup.notes.button': { es: 'Agregar/Editar nota', en: 'Add/Edit note' }
+  'stepMeetingPickup.notes.button': { es: 'Agregar/Editar nota', en: 'Add/Edit note' },
+
+  // Step Schedule (Horario)
+  'stepSchedule.title': { es: 'Horario', en: 'Schedule' },
+  'stepSchedule.name.title': { es: 'Pon un nombre a tu horario', en: 'Give a name to your schedule' },
+  'stepSchedule.name.placeholder': { es: 'Por ejemplo, verano, precio de fin de semana...', en: 'For example, summer, weekend price...' },
+  'stepSchedule.startDate.title': { es: '¿Cuál es la fecha de inicio de tu actividad?', en: 'What is the start date of your activity?' },
+  'stepSchedule.startDate.hasEndDate': { es: 'Mi actividad tiene fecha de fin', en: 'My activity has an end date' },
+  'stepSchedule.weeklySchedule.title': { es: 'Horario semanal estándar', en: 'Standard weekly schedule' },
+  'stepSchedule.weeklySchedule.createSlots': { es: 'Crear franjas horarias habilitadas', en: 'Create enabled time slots' },
+  'stepSchedule.weeklySchedule.monday': { es: 'lunes', en: 'Monday' },
+  'stepSchedule.weeklySchedule.tuesday': { es: 'martes', en: 'Tuesday' },
+  'stepSchedule.weeklySchedule.wednesday': { es: 'miércoles', en: 'Wednesday' },
+  'stepSchedule.weeklySchedule.thursday': { es: 'jueves', en: 'Thursday' },
+  'stepSchedule.weeklySchedule.friday': { es: 'viernes', en: 'Friday' },
+  'stepSchedule.weeklySchedule.saturday': { es: 'sábado', en: 'Saturday' },
+  'stepSchedule.weeklySchedule.sunday': { es: 'domingo', en: 'Sunday' },
+  'stepSchedule.weeklySchedule.addTimeSlot': { es: 'Añadir franja horaria', en: 'Add time slot' },
+  'stepSchedule.exceptions.title': { es: 'Excepciones (Opcional)', en: 'Exceptions (Optional)' },
+  'stepSchedule.exceptions.description': { es: '¿Tienes horarios alternativos? Utiliza esta opción si quieres un horario diferente en un día especial, como Semana Santa o Navidad', en: 'Do you have alternative schedules? Use this option if you want a different schedule on a special day, like Easter or Christmas' },
+  'stepSchedule.exceptions.addDate': { es: 'Añadir fecha', en: 'Add date' },
+  'stepSchedule.exceptions.descriptionPlaceholder': { es: 'Descripción de la excepción...', en: 'Exception description...' },
+  'stepSchedule.buttons.back': { es: 'Volver', en: 'Back' },
+  'stepSchedule.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' }
 };
 
 export const getTranslation = (key: string, language: 'es' | 'en'): string => {
