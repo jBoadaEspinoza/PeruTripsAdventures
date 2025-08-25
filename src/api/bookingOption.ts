@@ -2,6 +2,45 @@ import { apiGet } from './apiConfig';
 import { apiPost } from './apiConfig';
 import { getRuc } from '../utils/configUtils';
 
+export interface BookingOptionCreateAvailabilityPricingDepartureTimeRequest {
+    activityId: string; // requerido
+    bookingOptionId: string; // requerido
+    title: string; // requerido, máx 50 caracteres
+    lang: string; // requerido
+    startDate: string; // ISO date (yyyy-MM-dd)
+    endDate?: string; // opcional (yyyy-MM-dd)
+    weeklySchedule: WeeklyScheduleRequest[]; // requerido
+    exceptions?: ScheduleExceptionRequest[]; // opcional
+}
+
+export interface WeeklyScheduleRequest {
+    dayOfWeek: number; // 0=Lunes, 1=Martes, etc.
+    startTime: string; // HH:mm
+    endTime?: string; // opcional HH:mm
+}
+
+export interface ScheduleExceptionRequest {
+    date: string; // ISO date (yyyy-MM-dd)
+    description: string; // requerido
+}
+
+export interface CreateBookingOptionAvailabilityPricingDepartureTimeResponse{
+    success: boolean;
+    message: string;
+    idCreated: string;
+}
+
+export interface AvailabilityPricingMode{
+    availabilityMode: string; // "TIME_SLOTS" | "OPENING_HOURS"
+    pricingMode: string; // "PER_PERSON" | "PER_GROUP"
+}
+
+export interface ApiErrorResponse {
+    success: false;
+    errorCode: string;
+    message: string;
+}
+
 export interface BookingPickupPointRequest {
     cityId: number;
     name: string;
@@ -170,6 +209,66 @@ export const bookingOptionApi = {
             return response;
         }catch(error: any){
             console.error('Booking Option API: Error creating booking option availability pricing:', error);
+            return {
+                success: false,
+                message: 'Error al crear la opción de reserva',
+                idCreated: ''
+            }
+        }
+    },
+    getAvailabilityPricingMode: async (bookingOptionId: string): Promise<AvailabilityPricingMode | ApiErrorResponse> => {
+        try {
+            const response = await apiGet<AvailabilityPricingMode | ApiErrorResponse>(`/booking-options/${bookingOptionId}/getAvailabilityPricingMode`);
+            
+            // Si la respuesta indica un error (success: false)
+            if (response && typeof response === 'object' && 'success' in response && response.success === false) {
+                return response as ApiErrorResponse;
+            }
+            
+            // Validar que la respuesta tenga la estructura correcta de AvailabilityPricingMode
+            if (response && typeof response === 'object' && 'availabilityMode' in response && 'pricingMode' in response) {
+                return response as AvailabilityPricingMode;
+            }
+            
+            // Si la respuesta no tiene la estructura esperada, verificar si está en data
+            if (response && typeof response === 'object' && 'data' in response) {
+                const responseAny = response as any;
+                if (responseAny.data && typeof responseAny.data === 'object' && 'availabilityMode' in responseAny.data && 'pricingMode' in responseAny.data) {
+                    return responseAny.data as AvailabilityPricingMode;
+                }
+            }
+            
+            // Si no se puede determinar la estructura, retornar error genérico
+            console.warn('Booking Option API: Response does not match expected structure:', response);
+            return {
+                success: false,
+                errorCode: 'INVALID_RESPONSE_STRUCTURE',
+                message: 'La respuesta del servidor no tiene la estructura esperada'
+            };
+        } catch (error: any) {
+            console.error('Booking Option API: Error getting availability pricing mode:', error);
+            return {
+                success: false,
+                errorCode: 'NETWORK_ERROR',
+                message: 'Error de conexión al obtener el modo de disponibilidad y precios'
+            };
+        }
+    },
+    createAvailabilityPricingDepartureTime: async (request: BookingOptionCreateAvailabilityPricingDepartureTimeRequest): Promise<CreateBookingOptionAvailabilityPricingDepartureTimeResponse> => {
+        try{
+            const response = await apiPost<CreateBookingOptionAvailabilityPricingDepartureTimeResponse>('/booking-options/createAvailabilityPricingDepartureTime', request);
+            if(response && typeof response === 'object'){
+                if('success' in response && 'idCreated' in response){
+                    return response as CreateBookingOptionAvailabilityPricingDepartureTimeResponse;
+                }
+            }
+            const responseAny = response as any;
+            if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+                return responseAny.data as CreateBookingOptionAvailabilityPricingDepartureTimeResponse;
+            }
+            return response;
+        }catch(error: any){
+            console.error('Booking Option API: Error creating booking option availability pricing departure time:', error);
             return {
                 success: false,
                 message: 'Error al crear la opción de reserva',
