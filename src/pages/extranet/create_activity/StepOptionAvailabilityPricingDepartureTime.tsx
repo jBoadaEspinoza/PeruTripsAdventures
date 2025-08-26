@@ -5,6 +5,7 @@ import { getTranslation } from '../../../utils/translations';
 import OptionSetupLayout from '../../../components/OptionSetupLayout';
 import { useAppSelector } from '../../../redux/store';
 import { bookingOptionApi, AvailabilityPricingMode } from '../../../api/bookingOption';
+import { appConfig } from '../../../config/appConfig';
 
 interface ScheduleData {
   scheduleName: string;
@@ -85,6 +86,35 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
   // Estado para mostrar ajustes avanzados
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
+  // Estado para la capacidad (step 3)
+  const [capacityData, setCapacityData] = useState({
+    minParticipants: 1,
+    maxParticipants: 1
+  });
+
+  // Estado para la capacidad obtenida de la API
+  const [apiCapacity, setApiCapacity] = useState<{
+    groupMinSize: number;
+    groupMaxSize: number | null;
+  } | null>(null);
+
+  // Estado para los niveles de precios (step 4)
+  const [pricingLevels, setPricingLevels] = useState<Array<{
+    id: string;
+    minPeople: number;
+    maxPeople: number;
+    clientPays: string;
+    pricePerPerson: string;
+  }>>([
+    {
+      id: '1',
+      minPeople: 1,
+      maxPeople: 1,
+      clientPays: '',
+      pricePerPerson: ''
+    }
+  ]);
 
   // Función helper para formatear fechas al formato esperado por la API Java
   const formatDateForAPI = (dateString: string): string => {
@@ -172,26 +202,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     }
   };
 
-  const handleAgeGroupChange = (groupId: string, field: 'name' | 'minAge' | 'maxAge', value: string | number) => {
-    setAgeGroups(prev => {
-      const updatedGroups = prev.map(group => 
-        group.id === groupId ? { ...group, [field]: value } : group
-      );
-      
-      // Si se cambió la edad mínima o máxima, reconectar los rangos
-      if (field === 'minAge' || field === 'maxAge') {
-        const connectedGroups = connectAgeRanges(updatedGroups);
-        return ensureProtectedGroupNames(connectedGroups);
-      }
-      
-      // Si se cambió el nombre, verificar si es un grupo protegido
-      if (field === 'name') {
-        return ensureProtectedGroupNames(updatedGroups);
-      }
-      
-      return updatedGroups;
-    });
-  };
+
 
   // Función para conectar automáticamente los rangos de edad
   const connectAgeRanges = (groups: AgeGroup[]): AgeGroup[] => {
@@ -247,29 +258,20 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
   // Función para ajustar manualmente un rango de edad
   const handleManualAgeRangeChange = (groupId: string, field: 'minAge' | 'maxAge', value: number) => {
-    console.log('handleManualAgeRangeChange called:', { groupId, field, value });
-    
     // Solo permitir editar la edad máxima
     if (field === 'minAge') {
-      console.log('Blocking minAge edit');
       return; // No permitir edición de edad mínima
     }
     
-    console.log('Processing maxAge edit');
-    
     // Validar que el valor sea un número válido
     if (isNaN(value) || value < 0 || value > 99) {
-      console.log('Invalid value:', value);
       return;
     }
     
     setAgeGroups(prev => {
-      console.log('Previous age groups:', prev);
-      
       // Encontrar el grupo a editar
       const groupIndex = prev.findIndex(group => group.id === groupId);
       if (groupIndex === -1) {
-        console.log('Group not found:', groupId);
         return prev;
       }
       
@@ -282,131 +284,21 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         maxAge: value
       };
       
-      console.log('Updated groups before connection:', newGroups);
-      
       // Aplicar conexión automática solo a las edades mínimas
       const connectedGroups = connectAgeRanges(newGroups);
-      console.log('Connected groups:', connectedGroups);
       
       // Aplicar protección de nombres
       const finalGroups = ensureProtectedGroupNames(connectedGroups);
-      console.log('Final groups after protection:', finalGroups);
       
       return finalGroups;
     });
   };
 
-  // Función para aplicar la conexión automática cuando se necesite
-  const applyAgeRangeConnection = () => {
-    setAgeGroups(prev => {
-      const connectedGroups = connectAgeRanges(prev);
-      return ensureProtectedGroupNames(connectedGroups);
-    });
-  };
 
-  // Función para resetear a los grupos por defecto
-  const resetToDefaultGroups = () => {
-    const defaultGroups: AgeGroup[] = [
-      { id: '1', name: 'Infantes', minAge: 0, maxAge: 3 },
-      { id: '2', name: 'Niños', minAge: 4, maxAge: 12 },
-      { id: '3', name: 'Adultos', minAge: 13, maxAge: 64 },
-      { id: '4', name: 'Adulto mayor', minAge: 65, maxAge: 99 }
-    ];
-    setAgeGroups(defaultGroups);
-  };
 
-  // Función para validar que no haya gaps en los rangos de edad
-  const validateAgeRanges = (groups: AgeGroup[]): { isValid: boolean; errors: string[] } => {
-    const errors: string[] = [];
-    
-    // Ordenar grupos según el orden específico
-    const sortedGroups = [...groups].sort((a, b) => {
-      const orderMap: { [key: string]: number } = {
-        'Infante': 0,
-        'Niños': 1,
-        'Adultos': 2,
-        'Adulto mayor': 3
-      };
-      
-      const orderA = orderMap[a.name] ?? 999;
-      const orderB = orderMap[b.name] ?? 999;
-      
-      return orderA - orderB;
-    });
-    
-    // Validar que el primer grupo empiece en 0
-    if (sortedGroups[0].minAge !== 0) {
-      errors.push('El primer grupo debe empezar en 0');
-    }
-    
-    // Validar que no haya gaps entre grupos
-    for (let i = 0; i < sortedGroups.length - 1; i++) {
-      const currentGroup = sortedGroups[i];
-      const nextGroup = sortedGroups[i + 1];
-      
-      if (currentGroup.maxAge + 1 !== nextGroup.minAge) {
-        errors.push(`Gap detectado entre ${currentGroup.name} (${currentGroup.maxAge}) y ${nextGroup.name} (${nextGroup.minAge})`);
-      }
-    }
-    
-    // Validar que todos los grupos tengan nombres válidos
-    const invalidNames = groups.filter(group => !group.name.trim());
-    if (invalidNames.length > 0) {
-      errors.push('Todos los grupos deben tener un nombre válido');
-    }
-    
-    // Validar que las edades máximas sean mayores que las mínimas
-    const invalidRanges = groups.filter(group => group.minAge >= group.maxAge);
-    if (invalidRanges.length > 0) {
-      errors.push('La edad mínima debe ser menor que la edad máxima para todos los grupos');
-    }
-    
-    // Validar que existan los grupos obligatorios
-    const hasNinos = groups.some(group => group.name === 'Niños');
-    const hasAdultos = groups.some(group => group.name === 'Adultos');
-    
-    if (!hasNinos) {
-      errors.push('Debe existir un grupo llamado "Niños"');
-    }
-    
-    if (!hasAdultos) {
-      errors.push('Debe existir un grupo llamado "Adultos"');
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  };
 
-  // Función para guardar la configuración de grupos de edad
-  const handleSaveAgeGroups = () => {
-    // Aplicar conexión automática antes de validar
-    setAgeGroups(prev => {
-      const connectedGroups = connectAgeRanges(prev);
-      const finalGroups = ensureProtectedGroupNames(connectedGroups);
-      
-      // Validar después de conectar
-      const validation = validateAgeRanges(finalGroups);
-      
-      if (!validation.isValid) {
-        alert(`Error: ${validation.errors.join('\n')}`);
-        return prev; // Mantener el estado anterior si hay errores
-      }
-      
-      // Guardar la configuración en localStorage
-      localStorage.setItem(`${storageKey}_ageGroups`, JSON.stringify(finalGroups));
-      localStorage.setItem(`${storageKey}_pricingType`, pricingType);
-      
-      // Mostrar mensaje de éxito
-      alert('¡Configuración de grupos de edad guardada exitosamente!');
-      
-      // Continuar al step 3
-      navigate(`/extranet/activity/availabilityPricing?step=3&optionId=${optionId}&lang=${lang}&currency=${currency}`);
-      
-      return finalGroups;
-    });
-  };
+
+
 
   const optionId = searchParams.get('optionId');
   const lang = searchParams.get('lang');
@@ -432,7 +324,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       } else {
         // Es una respuesta exitosa
         setAvailabilityPricingMode(response as AvailabilityPricingMode);
-        console.log('Modo de disponibilidad obtenido:', response);
       }
     } catch (error) {
       console.error('Error al obtener modo de disponibilidad:', error);
@@ -446,6 +337,174 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     }
   };
 
+  // Funciones para manejar niveles de precios (step 4)
+  const handleAddPricingLevel = () => {
+    if (!apiCapacity) return;
+    
+    // Si groupMaxSize es null (ilimitado), comportamiento especial
+    if (apiCapacity.groupMaxSize === null) {
+      setPricingLevels(prev => {
+        const updatedLevels = [...prev];
+        
+        // Convertir la fila actual que dice "Ilimitado" en un input editable
+        const currentLevel = updatedLevels[updatedLevels.length - 1];
+        if (currentLevel.maxPeople === -1) {
+          // La fila actual era "Ilimitado", ahora le damos un valor específico
+          currentLevel.maxPeople = currentLevel.minPeople; // Valor inicial igual al mínimo
+        }
+        
+        // Calcular el nuevo rango mínimo para la nueva fila
+        const newMinPeople = currentLevel.maxPeople + 1;
+        
+        // Añadir el nuevo nivel que será "Ilimitado"
+        const newLevel = {
+          id: Date.now().toString(),
+          minPeople: newMinPeople,
+          maxPeople: -1, // -1 para indicar "Ilimitado"
+          clientPays: '',
+          pricePerPerson: ''
+        };
+        
+        return [...updatedLevels, newLevel];
+      });
+    } else {
+      // Si hay límite específico, comportamiento normal
+      const lastLevel = pricingLevels[pricingLevels.length - 1];
+      const newMinPeople = lastLevel.maxPeople + 1;
+      const newMaxPeople = Math.min(apiCapacity.groupMaxSize, newMinPeople + 9);
+      
+      const newLevel = {
+        id: Date.now().toString(),
+        minPeople: newMinPeople,
+        maxPeople: newMaxPeople,
+        clientPays: '',
+        pricePerPerson: ''
+      };
+      
+      setPricingLevels(prev => [...prev, newLevel]);
+    }
+  };
+
+  const handleRemovePricingLevel = (levelId: string) => {
+    if (pricingLevels.length > 1) {
+      setPricingLevels(prev => {
+        const filteredLevels = prev.filter(level => level.id !== levelId);
+        
+        // Reconectar rangos después de eliminar
+        return connectPricingRanges(filteredLevels);
+      });
+    }
+  };
+
+  const handlePricingLevelChange = (levelId: string, field: 'minPeople' | 'maxPeople' | 'clientPays', value: string | number) => {
+    setPricingLevels(prev => {
+      const updatedLevels = prev.map(level => 
+        level.id === levelId ? { ...level, [field]: value } : level
+      );
+      
+      // Si se cambió el precio que paga el cliente, calcular el precio por participante
+      if (field === 'clientPays') {
+        const level = updatedLevels.find(l => l.id === levelId);
+        if (level && level.clientPays) {
+          // Limpiar el valor de cualquier currency que el usuario haya incluido
+          let cleanValue = level.clientPays;
+          const currencyRegex = /\s*(USD|EUR|PEN|COP|MXN|ARS|CLP|BRL|GBP|JPY|CAD|AUD|CHF|SEK|NOK|DKK|PLN|CZK|HUF|RON|BGN|HRK|RUB|TRY|INR|CNY|KRW|SGD|HKD|NZD|THB|MYR|IDR|PHP|VND|BDT|PKR|LKR|KHR|MMK|LAK|MNT|KZT|UZS|TJS|TMT|AZN|GEL|AMD|BYN|MDL|UAH|BAM|RSD|MKD|ALL|XOF|XAF|XCD|ANG|AWG|BBD|BMD|BZD|CUC|CUP|DOP|EGP|FJD|GHS|GTQ|HNL|JMD|KES|LSL|MAD|MUR|NAD|NGN|PAB|PGK|PYG|QAR|SBD|SCR|SLL|SOS|SRD|STD|SYP|TND|TTD|TWD|TZS|UGX|UYU|VEF|VUV|WST|XPF|YER|ZAR|ZMW)\s*$/i;
+          
+          if (currencyRegex.test(cleanValue)) {
+            cleanValue = cleanValue.replace(currencyRegex, '').trim();
+            level.clientPays = cleanValue;
+          }
+          
+          level.pricePerPerson = calculatePricePerPerson(cleanValue);
+        }
+      }
+      
+      // Si se cambió el número máximo de personas, recalcular el precio por participante
+      if (field === 'maxPeople' && levelId) {
+        const level = updatedLevels.find(l => l.id === levelId);
+        if (level && level.clientPays && level.maxPeople !== -1) {
+          level.pricePerPerson = calculatePricePerPerson(level.clientPays);
+        }
+      }
+      
+      // Reconectar los rangos de personas automáticamente
+      return connectPricingRanges(updatedLevels);
+    });
+  };
+
+  // Función helper para calcular el precio por participante
+  const calculatePricePerPerson = (clientPays: string): string => {
+    // Limpiar el valor de cualquier currency que el usuario haya incluido
+    let cleanValue = clientPays;
+    const currencyRegex = /\s*(USD|EUR|PEN|COP|MXN|ARS|CLP|BRL|GBP|JPY|CAD|AUD|CHF|SEK|NOK|DKK|PLN|CZK|HUF|RON|BGN|HRK|RUB|TRY|INR|CNY|KRW|SGD|HKD|NZD|THB|MYR|IDR|PHP|VND|BDT|PKR|LKR|KHR|MMK|LAK|MNT|KZT|UZS|TJS|TMT|AZN|GEL|AMD|BYN|MDL|UAH|BAM|RSD|MKD|ALL|XOF|XAF|XCD|ANG|AWG|BBD|BMD|BZD|CUC|CUP|DOP|EGP|FJD|GHS|GTQ|HNL|JMD|KES|LSL|MAD|MUR|NAD|NGN|PAB|PGK|PYG|QAR|SBD|SCR|SLL|SOS|SRD|STD|SYP|TND|TTD|TWD|TZS|UGX|UYU|VEF|VUV|WST|XPF|YER|ZAR|ZMW)\s*$/i;
+    
+    if (currencyRegex.test(cleanValue)) {
+      cleanValue = cleanValue.replace(currencyRegex, '').trim();
+    }
+    
+    const clientPaysNum = parseFloat(cleanValue);
+    if (isNaN(clientPaysNum)) return '';
+    
+    // Fórmula: Precio por participante = Cliente paga - (Cliente paga × Comisión %)
+    const commissionPercentage = appConfig.pricing.defaultCommissionPercentage;
+    const commissionAmount = (clientPaysNum * commissionPercentage) / 100;
+    const pricePerPerson = clientPaysNum - commissionAmount;
+    
+    return pricePerPerson.toFixed(2);
+  };
+
+  // Función para conectar automáticamente los rangos de precios
+  const connectPricingRanges = (levels: typeof pricingLevels): typeof pricingLevels => {
+    const sortedLevels = [...levels].sort((a, b) => a.minPeople - b.minPeople);
+    
+    for (let i = 0; i < sortedLevels.length; i++) {
+      const currentLevel = sortedLevels[i];
+      
+      if (i === 0) {
+        // El primer nivel siempre empieza en 1
+        currentLevel.minPeople = 1;
+      } else {
+        // Los siguientes niveles empiezan donde terminó el anterior
+        const previousLevel = sortedLevels[i - 1];
+        // Solo conectar si el nivel anterior no es "ilimitado"
+        if (previousLevel.maxPeople !== -1) {
+          currentLevel.minPeople = previousLevel.maxPeople + 1;
+        } else {
+          // Si el nivel anterior es "ilimitado", empezar desde su minPeople + 1
+          currentLevel.minPeople = previousLevel.minPeople + 1;
+        }
+      }
+    }
+    
+    // Si groupMaxSize es null, solo la ÚLTIMA fila debe ser "ilimitado"
+    if (apiCapacity?.groupMaxSize === null && sortedLevels.length > 0) {
+      // Solo la ÚLTIMA fila debe ser "ilimitado"
+      const lastIndex = sortedLevels.length - 1;
+      sortedLevels[lastIndex] = {
+        ...sortedLevels[lastIndex],
+        maxPeople: -1 // Marcar como "ilimitado"
+      };
+      
+      // Las demás filas deben tener rangos editables
+      for (let i = 0; i < lastIndex; i++) {
+        if (sortedLevels[i].maxPeople === -1) {
+          // Si alguna fila intermedia es "ilimitado", darle un rango editable
+          const nextLevel = sortedLevels[i + 1];
+          const newMaxPeople = nextLevel.minPeople - 1;
+          sortedLevels[i] = {
+            ...sortedLevels[i],
+            maxPeople: newMaxPeople
+          };
+        } else if (sortedLevels[i].maxPeople === sortedLevels[i].minPeople) {
+          // Si el valor inicial es igual al mínimo, mantenerlo así
+          // Esto asegura que las filas nuevas mantengan su valor inicial
+        }
+      }
+    }
+    
+    return sortedLevels;
+  };
+
   // Cargar datos guardados al inicializar
   useEffect(() => {
     const savedData = localStorage.getItem(storageKey);
@@ -453,7 +512,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       try {
         const parsedData = JSON.parse(savedData);
         setFormData(prev => ({ ...prev, ...parsedData }));
-        console.log('StepOptionAvailabilityPricingDepartureTime: Datos cargados desde localStorage:', parsedData);
       } catch (error) {
         console.error('StepOptionAvailabilityPricingDepartureTime: Error al cargar datos desde localStorage:', error);
       }
@@ -482,17 +540,58 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     fetchAvailabilityPricingMode();
   }, [optionId]);
 
+  // Obtener la capacidad cuando se esté en el step 4 y pricingMode == PER_PERSON
+  useEffect(() => {
+    if (currentStep === 4 && optionId && availabilityPricingMode?.pricingMode === 'PER_PERSON') {
+      fetchAvailabilityPricingCapacity();
+    }
+  }, [currentStep, optionId, availabilityPricingMode?.pricingMode]);
+
+  // Inicializar niveles de precios cuando se cargue la capacidad de la API
+  useEffect(() => {
+    if (apiCapacity && pricingLevels.length === 1) {
+      // Actualizar el primer nivel con los valores de la API
+      setPricingLevels(prev => {
+        const updatedLevels = [...prev];
+        updatedLevels[0] = {
+          ...updatedLevels[0],
+          minPeople: apiCapacity.groupMinSize,
+          maxPeople: apiCapacity.groupMaxSize === null ? -1 : apiCapacity.groupMinSize // -1 para "ilimitado"
+        };
+        return updatedLevels;
+      });
+    }
+  }, [apiCapacity]);
+
+  // Función para obtener la capacidad de la API
+  const fetchAvailabilityPricingCapacity = async () => {
+    if (!optionId) return;
+    
+    try {
+      const response = await bookingOptionApi.getAvailabilityPricingCapacity(optionId);
+      
+      if ('success' in response && response.success === false) {
+        // Es un error de la API
+        console.error('Error al obtener capacidad:', response.message);
+        setApiCapacity(null);
+      } else {
+        // Es una respuesta exitosa
+        setApiCapacity(response as any);
+      }
+    } catch (error) {
+      console.error('Error al obtener capacidad:', error);
+      setApiCapacity(null);
+    }
+  };
+
   // Guardar datos en localStorage cuando cambien
   useEffect(() => {
     if (Object.keys(formData).length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(formData));
-      console.log('StepOptionAvailabilityPricingDepartureTime: Datos guardados en localStorage:', formData);
     }
   }, [formData, storageKey]);
 
   const handleSaveAndContinue = async () => {
-    console.log('StepOptionAvailabilityPricingDepartureTime: Guardando y continuando con datos:', formData);
-    
     // Si estamos en el step 1, consumir la API antes de continuar
     if (currentStep === 1) {
       try {
@@ -608,28 +707,16 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
             }))
         };
 
-        console.log('StepOptionAvailabilityPricingDepartureTime: Enviando datos a la API createAvailabilityPricingDepartureTime:', requestData);
-        console.log('StepOptionAvailabilityPricingDepartureTime: Weekly Schedule procesado:', requestData.weeklySchedule);
-        console.log('StepOptionAvailabilityPricingDepartureTime: Excepciones procesadas:', requestData.exceptions);
-        console.log('StepOptionAvailabilityPricingDepartureTime: Fechas procesadas - startDate:', requestData.startDate, 'endDate:', requestData.endDate);
-        console.log('StepOptionAvailabilityPricingDepartureTime: Fechas originales - startDate:', formData.startDate, 'endDate:', formData.endDate);
-        console.log('StepOptionAvailabilityPricingDepartureTime: Fechas formateadas - startDate:', formattedStartDate, 'endDate:', formData.hasEndDate && formData.endDate ? formatDateForAPI(formData.endDate) : 'undefined');
-        
         // Validación final: asegurar que no se envíen fechas vacías
         if (!requestData.startDate || requestData.startDate.trim() === '') {
           alert('Error: La fecha de inicio no puede estar vacía');
           return;
         }
         
-        // Debug: mostrar el JSON exacto que se enviará
-        console.log('StepOptionAvailabilityPricingDepartureTime: JSON a enviar:', JSON.stringify(requestData, null, 2));
-        
         // Consumir la API correcta
         const response = await bookingOptionApi.createAvailabilityPricingDepartureTime(requestData);
         
         if (response.success) {
-          console.log('StepOptionAvailabilityPricingDepartureTime: API exitosa, ID creado:', response.idCreated);
-          
           // Mostrar mensaje de éxito temporal
           alert('¡Configuración de horarios y tiempo de salida guardada exitosamente! Redirigiendo al siguiente paso...');
           
@@ -671,13 +758,121 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       
       // Si se selecciona "El precio depende de la edad", mostrar la interfaz de grupos de edad
       // (ya está implementada en el render)
-      return;
+    }
+    
+    // Si estamos en el step 3 y pricingMode = PER_PERSON
+    if (currentStep === 3 && availabilityPricingMode?.pricingMode === 'PER_PERSON') {
+      try {
+        // Validar que se haya configurado la capacidad
+        if (capacityData.minParticipants < 1) {
+          alert('Error: El número mínimo de participantes debe ser al menos 1');
+          return;
+        }
+        
+        if (capacityData.maxParticipants < capacityData.minParticipants) {
+          alert('Error: El número máximo de participantes debe ser mayor o igual al mínimo');
+          return;
+        }
+        
+        // Activar estado de carga
+        setIsSaving(true);
+        
+        // Preparar los datos para la API createAvailabilityPricingCapacity
+        const requestData = {
+          activityId: activityId || '',
+          bookingOptionId: optionId || '',
+          groupMinSize: capacityData.minParticipants
+        };
+        
+        // Consumir la API createAvailabilityPricingCapacity
+        const response = await bookingOptionApi.createAvailabilityPricingCapacity(requestData);
+        
+        if (response.success) {
+          // Mostrar mensaje de éxito temporal
+          alert('¡Configuración de capacidad guardada exitosamente! Redirigiendo al siguiente paso...');
+          
+          // Navegar al step 4
+          navigate(`/extranet/activity/availabilityPricing/create?step=4&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+          return;
+        } else {
+          console.error('StepOptionAvailabilityPricingDepartureTime: Error al guardar capacidad:', response.message);
+          alert(`Error al guardar la capacidad: ${response.message}`);
+          return;
+        }
+      } catch (error) {
+        console.error('StepOptionAvailabilityPricingDepartureTime: Error al consumir la API de capacidad:', error);
+        alert('Error de conexión al guardar la capacidad');
+      } finally {
+        // Desactivar estado de carga
+        setIsSaving(false);
+      }
+    }
+
+    // Si estamos en el step 4 y pricingMode = PER_PERSON
+    if (currentStep === 4 && availabilityPricingMode?.pricingMode === 'PER_PERSON') {
+      try {
+        // Validar que haya al menos un nivel de precios configurado
+        if (pricingLevels.length === 0) {
+          alert('Error: Debe configurar al menos un nivel de precios');
+          return;
+        }
+
+        // Validar que todos los niveles tengan precios configurados
+        const invalidLevels = pricingLevels.filter(level => !level.clientPays || level.clientPays.trim() === '');
+        if (invalidLevels.length > 0) {
+          alert('Error: Todos los niveles de precios deben tener un precio configurado');
+          return;
+        }
+
+        // Activar estado de carga
+        setIsSaving(true);
+
+        // Preparar los datos para la API createAvailabilityPricingPricePerPerson
+        const requestData = {
+          activityId: activityId || '',
+          bookingOptionId: optionId || '',
+          bookingPriceTiers: pricingLevels.map(level => ({
+            minParticipants: level.minPeople,
+            maxParticipants: level.maxPeople === -1 ? null : level.maxPeople,
+            totalPrice: parseFloat(level.clientPays) || 0,
+            commissionPercent: appConfig.pricing.defaultCommissionPercentage,
+            pricePerParticipant: parseFloat(level.pricePerPerson) || 0,
+            currency: (currency || 'USD').toUpperCase()
+          }))
+        };
+
+        // Consumir la API createAvailabilityPricingPricePerPerson
+        const response = await bookingOptionApi.createAvailabilityPricingPricePerPerson(requestData);
+
+        if (response.success) {
+
+          // Mostrar mensaje de éxito temporal
+          alert('¡Configuración de precios guardada exitosamente! Redirigiendo...');
+
+          // Redirigir a la página principal de availabilityPricing
+          navigate(`/extranet/activity/availabilityPricing?optionId=${optionId}&lang=${lang}&currency=${currency}`);
+          return;
+        } else {
+          console.error('StepOptionAvailabilityPricingDepartureTime: Error al guardar precios:', response.message);
+          alert(`Error al guardar los precios: ${response.message}`);
+          return;
+        }
+      } catch (error) {
+        console.error('StepOptionAvailabilityPricingDepartureTime: Error al consumir la API de precios:', error);
+        alert('Error de conexión al guardar los precios');
+      } finally {
+        // Desactivar estado de carga
+        setIsSaving(false);
+      }
     }
     
     // Para otros steps, navegar normalmente
-    if (currentStep < 5) {
+    if (currentStep < 4) {
       const nextStep = currentStep + 1;
       navigate(`/extranet/activity/availabilityPricing?step=${nextStep}&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+    } else if (currentStep === 4) {
+      // El step 4 ya se maneja arriba, no hacer nada aquí
+      return;
     } else {
       // If we're at the last step, go back to the main availability pricing page
       navigate('/extranet/activity/availabilityPricing');
@@ -685,8 +880,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
   };
 
   const handleBack = () => {
-    console.log('StepOptionAvailabilityPricingDepartureTime: Datos mantenidos en localStorage al regresar');
-    
     // Navigate to previous step based on current step
     if (currentStep > 1) {
       const prevStep = currentStep - 1;
@@ -890,19 +1083,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                        </div>
                      </div>
 
-                     {/* Connector Line */}
-                     <div className="flex-grow-1 mx-3" style={{ height: '2px', backgroundColor: currentStep > 4 ? '#28a745' : '#e9ecef' }}></div>
 
-                     {/* Step 5: Actividades complementarias */}
-                     <div className="d-flex align-items-center">
-                       <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${currentStep === 5 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
-                         <span className="fw-bold">5</span>
-                       </div>
-                       <div>
-                         <span className={currentStep === 5 ? 'fw-bold text-dark' : 'text-muted'}>Actividades complementarias (opcionales)</span>
-                         {currentStep === 5 && <div className="bg-primary" style={{ height: '3px', width: '100%' }}></div>}
-                       </div>
-                     </div>
                    </div>
                  </div>
 
@@ -1566,28 +1747,20 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                <button 
                                  type="button" 
                                  className="btn btn-primary"
-                                 onClick={handleSaveAgeGroups}
+                                 onClick={() => {
+                                   // Guardar la configuración en localStorage
+                                   localStorage.setItem(`${storageKey}_ageGroups`, JSON.stringify(ageGroups));
+                                   localStorage.setItem(`${storageKey}_pricingType`, pricingType);
+                                   
+                                   // Continuar al step 3
+                                   navigate(`/extranet/activity/availabilityPricing?step=3&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+                                 }}
                                >
                                  <i className="fas fa-arrow-right me-2"></i>
                                  Continuar al siguiente paso
                                </button>
                              </div>
-                           )}
-                           
-                           {/* Mensaje de validación */}
-                           {ageGroups.length > 0 && (
-                             <div className="mt-3">
-                               {(() => {
-                                 const validation = validateAgeRanges(ageGroups);
-                                 return validation.errors.map((error, index) => (
-                                   <div key={index} className="text-warning" style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                                     <i className="fas fa-exclamation-triangle me-2"></i>
-                                     {error}
-                                   </div>
-                                 ));
-                               })()}
-                             </div>
-                           )}
+                           )}           
                          </div>
                        )}
                        
@@ -1636,30 +1809,18 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                           
                           <div className="row">
                             <div className="d-flex flex-column">
-                            <div className="col-md-4 mb-4 d-flex justify-content-start">
-                              <label htmlFor="minParticipants" className="form-label text-muted d-flex align-items-center">
-                                  Número mínimo de participantes
-                              </label>
-                              <input
-                                type="number"
-                                className="form-control"
-                                id="minParticipants"
-                                min="1"
-                                defaultValue="1"
-                              />
-                            </div>
-                            
-                            <div className="col-md-4 mb-4 d-flex justify-content-start">
-                              <label htmlFor="maxParticipants" className="form-label text-muted">
-                                Número máximo de participantes
-                              </label>
-                              <input
-                                type="number"
-                                className="form-control"
-                                id="maxParticipants"
-                                min="1"
-                              />
-                            </div>
+                              <div className="col-md-4 mb-4 d-flex justify-content-start">
+                                <label htmlFor="minParticipants" className="form-label text-muted d-flex align-items-center">
+                                    Número mínimo de participantes
+                                </label>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  id="minParticipants"
+                                  min="1"
+                                  defaultValue="1"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1678,100 +1839,170 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                       )
                      ) : currentStep === 4 ? (
                        // Paso 4: Precio
-                       <div>
-                         <h5 className="fw-bold mb-4 text-dark">
-                           Establece el precio de tu actividad
-                         </h5>
-                         
-                         <h6 className="fw-bold mb-4 text-dark">
-                           Participante
-                         </h6>
-                         
-                         <div className="row">
-                           <div className="col-md-3 mb-4">
-                             <label className="form-label text-muted">
-                               Número de personas
-                             </label>
-                             <div className="d-flex align-items-center">
-                               <span className="text-muted me-2">1 a 20</span>
-                               <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
+                       availabilityPricingMode && availabilityPricingMode.pricingMode === 'PER_PERSON' ? (
+                         <div>
+                           <h5 className="fw-bold mb-4 text-dark">
+                             Establece el precio de tu actividad
+                           </h5>
+                           
+                           <h6 className="fw-bold mb-4 text-dark">
+                             Participante
+                           </h6>
+                           
+                           {/* Rango total de personas */}
+                           {availabilityPricingMode?.pricingMode === 'PER_PERSON' && apiCapacity && (
+                             <div className="mb-3">
+                               <div className="d-flex align-items-center">
+                                 <span className="text-muted me-2">
+                                   Rango de personas: {apiCapacity.groupMinSize} a {apiCapacity.groupMaxSize || 'Ilimitado'}
+                                 </span>
+                                 <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
+                               </div>
+                             </div>
+                           )}
+                           
+                           {/* Headers de la tabla */}
+                           <div className="row mb-3">
+                             <div className="col-md-4">
+                               <label className="form-label text-muted fw-bold">
+                                 Número de personas
+                               </label>
+                             </div>
+                             <div className="col-md-2">
+                               <label className="form-label text-muted fw-bold">
+                                 El cliente paga
+                               </label>
+                             </div>
+                             <div className="col-md-2">
+                               <label className="form-label text-muted fw-bold">
+                                 Comisión
+                               </label>
+                             </div>
+                             <div className="col-md-2">
+                               <label className="form-label text-muted fw-bold">
+                                 Precio por participante
+                               </label>
+                             </div>
+                             <div className="col-md-2">
+                               <label className="form-label text-muted fw-bold">
+                                Acciones
+                               </label>
                              </div>
                            </div>
+
+                           {/* Filas de precios */}
+                           {pricingLevels.map((level, index) => (
+                             <div key={level.id} className="row mb-3 align-items-end">
+                               <div className="col-md-4">
+                                 <div className="d-flex align-items-center">
+                                   <span className="text-black fw-bold me-2">
+                                     {level.minPeople} a{' '}
+                                     {level.maxPeople === -1 ? (
+                                       <span className="text-primary fw-bold">Ilimitado</span>
+                                     ) : (
+                                       <input
+                                         type="number"
+                                         className="form-control form-control-sm d-inline-block"
+                                         style={{ width: '60px' }}
+                                         value={level.maxPeople}
+                                         onChange={(e) => handlePricingLevelChange(level.id, 'maxPeople', parseInt(e.target.value) || 1)}
+                                         min={level.minPeople + 1}
+                                         max={apiCapacity?.groupMaxSize || 999}
+                                       />
+                                     )}
+                                   </span>
+                                   {index > 0 && (
+                                     <i className="fas fa-info-circle text-muted ms-2" style={{ fontSize: '14px' }}></i>
+                                   )}
+                                 </div>
+                               </div>
+                               
+                               <div className="col-md-2">
+                                 <div className="input-group">
+                                   <input
+                                     type="text"
+                                     className="form-control"
+                                     placeholder="0"
+                                     value={level.clientPays}
+                                     onChange={(e) => handlePricingLevelChange(level.id, 'clientPays', e.target.value)}
+                                   />
+                                   <span className="input-group-text">
+                                     {(currency || 'USD').toUpperCase()}
+                                   </span>
+                                 </div>
+                               </div>
+                               
+                               <div className="col-md-2">
+                                 <input
+                                   type="text"
+                                   className="form-control"
+                                   value={`${appConfig.pricing.defaultCommissionPercentage}%`}
+                                   readOnly
+                                   disabled
+                                 />
+                               </div>
+                               
+                               <div className="col-md-2">
+                                 <div className="input-group">
+                                   <input
+                                     type="text"
+                                     className="form-control"
+                                     placeholder="0.00"
+                                     value={level.pricePerPerson}
+                                     readOnly
+                                     disabled
+                                   />
+                                   <span className="input-group-text">
+                                     {(currency || 'USD').toUpperCase()}
+                                   </span>
+                                 </div>
+                               </div>
+
+                               {/* Columna de Acciones */}
+                               <div className="col-md-2">
+                                 {/* Botón eliminar solo en la última fila (excluyendo la primera) */}
+                                 {index === pricingLevels.length - 1 && index > 0 ? (
+                                   <button
+                                     type="button"
+                                     className="btn btn-outline-danger btn-sm"
+                                     onClick={() => handleRemovePricingLevel(level.id)}
+                                   >
+                                     <i className="fas fa-minus-circle me-1"></i>
+                                     Eliminar
+                                   </button>
+                                 ) : (
+                                   <span className="text-muted">-</span>
+                                 )}
+                               </div>
+
+                             </div>
+                           ))}
                            
-                           <div className="col-md-3 mb-4">
-                             <label className="form-label text-muted">
-                               El cliente paga
-                             </label>
-                             <input
-                               type="text"
-                               className="form-control"
-                               placeholder="USD"
-                             />
-                           </div>
-                           
-                           <div className="col-md-3 mb-4">
-                             <label className="form-label text-muted">
-                               Comisión
-                             </label>
-                             <input
-                               type="text"
-                               className="form-control"
-                               value="30%"
-                               readOnly
-                             />
-                           </div>
-                           
-                           <div className="col-md-3 mb-4">
-                             <label className="form-label text-muted">
-                               Precio por participante
-                             </label>
-                             <input
-                               type="text"
-                               className="form-control"
-                               placeholder=""
-                             />
+                           <div className="mt-4">
+                             <button 
+                               type="button" 
+                               className="btn btn-primary d-flex align-items-center"
+                               onClick={handleAddPricingLevel}
+                             >
+                               <i className="fas fa-plus me-2"></i>
+                               Precio por nivel
+                             </button>
                            </div>
                          </div>
-                         
-                         <div className="mt-4">
-                           <button 
-                             type="button" 
-                             className="btn btn-link text-primary p-0 d-flex align-items-center"
-                           >
-                             <i className="fas fa-plus me-2"></i>
-                             Precio por nivel
-                           </button>
+                       ) : (
+                         <div>
+                           <div className="text-center py-5">
+                             <div className="text-muted">
+                               <i className="fas fa-info-circle fa-3x mb-3"></i>
+                               <h5 className="text-muted">Configuración no disponible</h5>
+                               <p className="text-muted">
+                                 La configuración de precios solo está disponible cuando el modo de precios es "Por persona".
+                               </p>
+                             </div>
+                           </div>
                          </div>
-                       </div>
-                        ) : currentStep === 5 ? (
-                        // Paso 5: Actividades complementarias (opcional)
-                        <div>
-                          <h5 className="fw-bold mb-4 text-dark">
-                            Actividades complementarias (opcional)
-                          </h5>
-                          
-                          <h6 className="fw-bold mb-4 text-dark">
-                            ¿Qué es una actividad complementaria?
-                          </h6>
-                          
-                          <p className="text-muted mb-4">
-                            Ofrece servicios o elementos adicionales para tus actividades con el fin de mejorar la experiencia de los viajeros.
-                          </p>
-                          
-                          <div className="d-flex justify-content-center mb-4">
-                            <div className="input-group" style={{ maxWidth: '400px' }}>
-                              <span className="input-group-text bg-white border-end-0">
-                                <i className="fas fa-search text-muted"></i>
-                              </span>
-                              <input
-                                type="text"
-                                className="form-control border-start-0"
-                                placeholder="Search..."
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
+                       )
+                     ) : (
                         // Error para valores de step no válidos
                         <div className="mb-5">
                                                   <div className="text-danger border-0">
@@ -1782,7 +2013,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                 Paso no válido
                               </h5>
                               <p className="mb-0 text-danger">
-                                El valor del paso "{currentStep}" no es válido. Solo se permiten pasos del 1 al 5.
+                                El valor del paso "{currentStep}" no es válido. Solo se permiten pasos del 1 al 4.
                               </p>
                             </div>
                           </div>

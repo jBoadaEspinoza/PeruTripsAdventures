@@ -16,6 +16,9 @@ export interface AppConfig {
     baseUrl: string;
     timeout: number;
   };
+  pricing: {
+    defaultCommissionPercentage: number;
+  };
 }
 
 export const appConfig: AppConfig = {
@@ -35,6 +38,9 @@ export const appConfig: AppConfig = {
   api: {
     baseUrl: "https://tg4jd2gc-8080.brs.devtunnels.ms",
     timeout: 10000
+  },
+  pricing: {
+    defaultCommissionPercentage: 0
   }
 };
 
