@@ -24,10 +24,21 @@ export const useExtranetAuth = () => {
     if (shouldValidate && !isValidating) {
       setIsValidating(true);
       try {
-        await validateToken(language);
-        setLastValidationTime(now);
+        const result = await validateToken(language);
+        if (result) {
+          setLastValidationTime(now);
+        } else {
+          // Si la validación falla y no hay token válido, limpiar localStorage
+          const authToken = localStorage.getItem('authToken');
+          if (!authToken) {
+            console.log('useExtranetAuth: Token no válido, limpiando estado');
+            // No redirigir aquí, dejar que OptionSetupLayout maneje la redirección
+          }
+        }
       } catch (error) {
         console.error('Error validating token:', error);
+        // En caso de error de red, no limpiar el estado de autenticación
+        // Solo limpiar si es un error de token inválido
       } finally {
         setIsValidating(false);
       }

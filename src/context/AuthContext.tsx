@@ -68,6 +68,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         authApi.saveUserInfo(response.data);
         return true;
       } else {
+        // Token inválido - limpiar estado
+        console.log('AuthContext: Token inválido, limpiando estado');
         authApi.logout();
         setIsAuthenticated(false);
         setUser(null);
@@ -76,12 +78,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
     } catch (error: any) {
-      authApi.logout();
-      setIsAuthenticated(false);
-      setUser(null);
-      setCompany(null);
-      setRole(null);
-      return false;
+      // Distinguir entre errores de red y errores de token
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        // Token expirado o inválido
+        console.log('AuthContext: Token expirado/inválido, limpiando estado');
+        authApi.logout();
+        setIsAuthenticated(false);
+        setUser(null);
+        setCompany(null);
+        setRole(null);
+        return false;
+      } else {
+        // Error de red - mantener estado actual
+        console.log('AuthContext: Error de red, manteniendo estado de autenticación');
+        return isAuthenticated;
+      }
     } finally {
       setIsValidating(false);
     }

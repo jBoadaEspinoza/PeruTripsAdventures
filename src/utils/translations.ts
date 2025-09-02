@@ -1620,7 +1620,25 @@ export const translations: Translations = {
   'stepSchedule.exceptions.addDate': { es: 'Añadir fecha', en: 'Add date' },
   'stepSchedule.exceptions.descriptionPlaceholder': { es: 'Descripción de la excepción...', en: 'Exception description...' },
   'stepSchedule.buttons.back': { es: 'Volver', en: 'Back' },
-  'stepSchedule.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' }
+  'stepSchedule.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' },
+
+  // Step Cut Off (Hora límite)
+  'stepCutOff.title': { es: 'Establece tu hora límite', en: 'Set your limit time' },
+  'stepCutOff.description': { es: 'La hora límite es la última en que aceptas nuevas reservas antes de la hora de inicio o de cierre.', en: 'The limit time is the last time you accept new bookings before the start or end time.' },
+  'stepCutOff.learnMore': { es: 'Learn more', en: 'Learn more' },
+  'stepCutOff.defaultCutOff.title': { es: '¿Con cuánta antelación dejas de aceptar nuevas reservas? Esta es tu hora límite por defecto.', en: 'How far in advance do you stop accepting new bookings? This is your default limit time.' },
+  'stepCutOff.defaultCutOff.example': { es: 'Ejemplo: si la hora de inicio de la actividad es a las 10:00, las reservas se detendrán a las 9:30.', en: 'Example: if the activity start time is 10:00, bookings will stop at 9:30.' },
+  'stepCutOff.infoAlert.message': { es: 'Establecer una hora límite más baja puede captar reservas de última hora y aumentar las ventas de tu producto.', en: 'Setting a lower limit time can capture last-minute bookings and increase your product sales.' },
+  'stepCutOff.lastMinuteBookings.title': { es: 'Habilitar las reservas de última hora después de la primera reserva (opcional)', en: 'Enable last-minute bookings after the first booking (optional)' },
+  'stepCutOff.lastMinuteBookings.description': { es: 'Una vez realizada la primera reserva para una franja horaria, se elimina la hora límite, permitiendo que se hagan más reservas hasta la hora de inicio o de cierre de esa franja horaria.', en: 'Once the first booking for a time slot is made, the limit time is removed, allowing more bookings to be made until the start or end time of that time slot.' },
+  'stepCutOff.differentCutOff.title': { es: '¿Quieres que tus franjas horarias tengan horas límite diferentes?', en: 'Do you want your time slots to have different limit times?' },
+  'stepCutOff.differentCutOff.no': { es: 'No', en: 'No' },
+  'stepCutOff.differentCutOff.yes': { es: 'Sí', en: 'Yes' },
+  'stepCutOff.differentCutOff.description': { es: 'Puedes sobrescribir la hora límite que aparece por defecto con otro valor para cada franja horaria.', en: 'You can override the default limit time with a different value for each time slot.' },
+  'stepCutOff.timeSlots.title': { es: 'Establece la hora límite para las franjas horarias en las que necesites una configuración diferente', en: 'Set the limit time for time slots where you need a different configuration' },
+  'stepCutOff.timeSlots.applyToAll': { es: 'Aplicar a todas', en: 'Apply to all' },
+  'stepCutOff.buttons.back': { es: 'Atrás', en: 'Back' },
+  'stepCutOff.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' }
 };
 
 export const getTranslation = (key: string, language: 'es' | 'en'): string => {

@@ -23,6 +23,8 @@ export default function StepOptionAvailabilityPrice() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAvailabilityPricingCompleted, setIsAvailabilityPricingCompleted] = useState(false);
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(true);
 
   const optionId = searchParams.get('optionId');
   const storageKey = `availabilityPricing_${optionId || 'default'}`;
@@ -40,6 +42,34 @@ export default function StepOptionAvailabilityPrice() {
       }
     }
   }, [storageKey]);
+
+  // Verificar si la disponibilidad y precios están completos
+  useEffect(() => {
+    const checkAvailabilityPricingCompletion = async () => {
+      if (!optionId) {
+        setIsCheckingCompletion(false);
+        return;
+      }
+
+      try {
+        setIsCheckingCompletion(true);
+        const response = await bookingOptionApi.isBookingOptionAvailabilityPricingCompleted(optionId);
+        
+        if (response.success && response.data?.isComplete) {
+          setIsAvailabilityPricingCompleted(true);
+        } else {
+          setIsAvailabilityPricingCompleted(false);
+        }
+      } catch (error) {
+        console.error('StepOptionAvailabilityPrice: Error al verificar completitud:', error);
+        setIsAvailabilityPricingCompleted(false);
+      } finally {
+        setIsCheckingCompletion(false);
+      }
+    };
+
+    checkAvailabilityPricingCompletion();
+  }, [optionId]);
 
   // Guardar datos en localStorage cuando cambien
   useEffect(() => {
@@ -89,9 +119,9 @@ export default function StepOptionAvailabilityPrice() {
 
   const handleContinue = () => {
     console.log('StepOptionAvailabilityPrice: Continuando con datos:', formData);
-    // Aquí se implementará la lógica para continuar al siguiente paso
-    // Por ahora solo navegamos de vuelta
-    navigate('/extranet/activity/meetingPickup');
+    // navega a la página de configuración de corte
+    const currency = 'PEN'; // Por defecto, se puede obtener del contexto si está disponible
+    navigate(`/extranet/activity/cutOff?optionId=${optionId}&lang=${language}&currency=${currency}`);
   };
 
   const handleBack = () => {
@@ -164,12 +194,44 @@ export default function StepOptionAvailabilityPrice() {
                     {getTranslation('stepAvailabilityPricing.title', language)}
                   </h4>
                   <i className="fas fa-info-circle text-primary"></i>
+                  
+                  {/* Indicador de estado de completitud */}
+                  {!isCheckingCompletion && (
+                    <div className="ms-auto">
+                      {isAvailabilityPricingCompleted ? (
+                        <span className="badge bg-success">
+                          <i className="fas fa-check me-1"></i>
+                          {language === 'es' ? 'Completo' : 'Complete'}
+                        </span>
+                      ) : (
+                        <span className="badge bg-warning text-dark">
+                          <i className="fas fa-clock me-1"></i>
+                          {language === 'es' ? 'Pendiente' : 'Pending'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Descripción introductoria */}
                 <p className="text-muted mb-4">
                   {getTranslation('stepAvailabilityPricing.description', language)}
                 </p>
+
+                {/* Indicador de carga inicial */}
+                {isCheckingCompletion && (
+                  <div className="text-center mb-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Verificando estado...</span>
+                    </div>
+                    <p className="text-muted mt-2">
+                      {language === 'es' 
+                        ? 'Verificando estado de la configuración de disponibilidad y precios...'
+                        : 'Checking availability and pricing configuration status...'
+                      }
+                    </p>
+                  </div>
+                )}
 
                 {/* Sección 1: ¿Cómo estableces tu disponibilidad? */}
                 <div className="mb-5">
@@ -303,11 +365,43 @@ export default function StepOptionAvailabilityPrice() {
                     type="button" 
                     className="btn btn-primary"
                     onClick={handleContinue}
+                    disabled={isCheckingCompletion || !isAvailabilityPricingCompleted}
                   >
+                    {isCheckingCompletion ? (
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    ) : (
+                      <i className="fas fa-arrow-right me-2"></i>
+                    )}
                     {getTranslation('stepAvailabilityPricing.buttons.continue', language)}
-                    <i className="fas fa-arrow-right ms-2"></i>
                   </button>
                 </div>
+
+                {/* Mensaje informativo sobre el estado del botón Continuar */}
+                {!isCheckingCompletion && (
+                  <div className="mt-3 text-center">
+                    {isAvailabilityPricingCompleted ? (
+                      <div className="text-success">
+                        <i className="fas fa-check-circle me-2"></i>
+                        <small>
+                          {language === 'es' 
+                            ? 'La configuración de disponibilidad y precios está completa. Puedes continuar al siguiente paso.'
+                            : 'Availability and pricing configuration is complete. You can continue to the next step.'
+                          }
+                        </small>
+                      </div>
+                    ) : (
+                      <div className="text-warning">
+                        <i className="fas fa-exclamation-triangle me-2"></i>
+                        <small>
+                          {language === 'es' 
+                            ? 'La configuración de disponibilidad y precios no está completa. Completa la configuración antes de continuar.'
+                            : 'Availability and pricing configuration is not complete. Complete the configuration before continuing.'
+                          }
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

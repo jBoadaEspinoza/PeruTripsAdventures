@@ -706,7 +706,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
               description: exception.description
             }))
         };
-
+        
         // Validación final: asegurar que no se envíen fechas vacías
         if (!requestData.startDate || requestData.startDate.trim() === '') {
           alert('Error: La fecha de inicio no puede estar vacía');
@@ -1092,37 +1092,37 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                     // Paso 1: Horario - Contenido completo
                     <div>
                       {/* Indicador de carga para el modo de disponibilidad */}
-                                          {isLoadingMode && (
-                      <div className="mb-4">
+                      {isLoadingMode && (
+                        <div className="mb-4">
                         <div className="text-info">
-                          <i className="fas fa-spinner fa-spin me-2"></i>
-                          Cargando configuración de horarios...
+                            <i className="fas fa-spinner fa-spin me-2"></i>
+                            Cargando configuración de horarios...
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                                          {/* Información del modo de disponibilidad */}
-                    {!isLoadingMode && availabilityPricingMode && (
-                      <div className="mb-4">
+                      {/* Información del modo de disponibilidad */}
+                      {!isLoadingMode && availabilityPricingMode && (
+                        <div className="mb-4">
                         <div className={`${availabilityPricingMode.availabilityMode === 'TIME_SLOTS' ? 'text-success' : 'text-warning'}`}>
-                          <i className={`fas ${availabilityPricingMode.availabilityMode === 'TIME_SLOTS' ? 'fa-clock' : 'fa-door-open'} me-2`}></i>
-                          <strong>Modo de horario:</strong> {
-                            availabilityPricingMode.availabilityMode === 'TIME_SLOTS' 
-                              ? 'Franjas horarias (TIME_SLOTS)' 
-                              : 'Horario de apertura (OPENING_HOURS)'
-                          }
-                          {availabilityPricingMode.pricingMode && (
-                            <span className="ms-2">
-                              • <strong>Modo de precios:</strong> {
-                                availabilityPricingMode.pricingMode === 'PER_PERSON' 
-                                  ? 'Por persona' 
-                                  : 'Por grupo'
-                              }
-                            </span>
-                          )}
+                            <i className={`fas ${availabilityPricingMode.availabilityMode === 'TIME_SLOTS' ? 'fa-clock' : 'fa-door-open'} me-2`}></i>
+                            <strong>Modo de horario:</strong> {
+                              availabilityPricingMode.availabilityMode === 'TIME_SLOTS' 
+                                ? 'Franjas horarias (TIME_SLOTS)' 
+                                : 'Horario de apertura (OPENING_HOURS)'
+                            }
+                            {availabilityPricingMode.pricingMode && (
+                              <span className="ms-2">
+                                • <strong>Modo de precios:</strong> {
+                                  availabilityPricingMode.pricingMode === 'PER_PERSON' 
+                                    ? 'Por persona' 
+                                    : 'Por grupo'
+                                }
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                       {/* Nombre del horario */}
                       <div className="mb-4">
@@ -1191,18 +1191,18 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                         // Estado de carga o error
                         <div className="mb-4">
                                                   <div className="text-warning">
-                          <i className="fas fa-exclamation-triangle me-2"></i>
-                          No se pudo cargar la configuración de horarios. Se mostrará el modo por defecto.
-                          <button 
-                            type="button" 
-                            className="btn btn-sm btn-outline-warning ms-3"
-                            onClick={fetchAvailabilityPricingMode}
-                            disabled={isLoadingMode}
-                          >
-                            <i className="fas fa-sync-alt me-1"></i>
-                            Reintentar
-                          </button>
-                        </div>
+                            <i className="fas fa-exclamation-triangle me-2"></i>
+                            No se pudo cargar la configuración de horarios. Se mostrará el modo por defecto.
+                            <button 
+                              type="button" 
+                              className="btn btn-sm btn-outline-warning ms-3"
+                              onClick={fetchAvailabilityPricingMode}
+                              disabled={isLoadingMode}
+                            >
+                              <i className="fas fa-sync-alt me-1"></i>
+                              Reintentar
+                            </button>
+                          </div>
                           
                           {/* Mostrar horario estándar como fallback */}
                           <div className="mb-4">
@@ -1563,7 +1563,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                        <div className="d-flex justify-content-between align-items-center mb-4">
                          <h5 className="fw-bold mb-0">
                            Categorías de precios:
-                         </h5>
+                       </h5>
                          <div className="d-flex align-items-center">
                            <span className="me-2">Mostrar ajustes avanzados</span>
                            <div className="form-check form-switch">
@@ -1609,7 +1609,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                            </label>
                          </div>
                        </div>
-
+                       
                        {/* Mostrar interfaz de grupos de edad solo si se selecciona "El precio depende de la edad" */}
                        {pricingType === 'ageBased' && (
                          <div className="mb-4">
@@ -1665,7 +1665,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                              style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                                              title="La edad mínima se conecta automáticamente con la edad máxima del grupo anterior"
                                            />
-                                         </div>
+                         </div>
                                          <div className="col-6">
                                            <input
                                              type="number"
@@ -1676,7 +1676,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                              onChange={(e) => handleManualAgeRangeChange(group.id, 'maxAge', parseInt(e.target.value) || 0)}
                                              title="Edita la edad máxima para conectar automáticamente con el siguiente grupo"
                                            />
-                                         </div>
+                       </div>
                                        </div>
                                      </div>
                                    </div>
@@ -1798,32 +1798,32 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                      ) : currentStep === 3 ? (
                       // Paso 3: Capacidad
                       availabilityPricingMode && availabilityPricingMode.pricingMode === 'PER_PERSON' ? (
-                        <div>
-                          <h5 className="fw-bold mb-4 text-dark">
-                            Veamos la capacidad
-                          </h5>
-                          
-                          <h6 className="fw-bold mb-4 text-dark">
-                            ¿Cuántos participantes puedes aceptar por franja horaria?
-                          </h6>
-                          
-                          <div className="row">
+                      <div>
+                        <h5 className="fw-bold mb-4 text-dark">
+                          Veamos la capacidad
+                        </h5>
+                        
+                        <h6 className="fw-bold mb-4 text-dark">
+                          ¿Cuántos participantes puedes aceptar por franja horaria?
+                        </h6>
+                        
+                        <div className="row">
                             <div className="d-flex flex-column">
                               <div className="col-md-4 mb-4 d-flex justify-content-start">
-                                <label htmlFor="minParticipants" className="form-label text-muted d-flex align-items-center">
-                                    Número mínimo de participantes
-                                </label>
-                                <input
-                                  type="number"
-                                  className="form-control"
-                                  id="minParticipants"
-                                  min="1"
-                                  defaultValue="1"
-                                />
-                              </div>
-                            </div>
+                            <label htmlFor="minParticipants" className="form-label text-muted d-flex align-items-center">
+                              Número mínimo de participantes
+                            </label>
+                            <input
+                              type="number"
+                              className="form-control"
+                              id="minParticipants"
+                              min="1"
+                              defaultValue="1"
+                            />
+                          </div>
                           </div>
                         </div>
+                      </div>
                       ) : (
                         <div>
                           <div className="text-center py-5">
@@ -1837,28 +1837,28 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                           </div>
                         </div>
                       )
-                     ) : currentStep === 4 ? (
+                      ) : currentStep === 4 ? (
                        // Paso 4: Precio
                        availabilityPricingMode && availabilityPricingMode.pricingMode === 'PER_PERSON' ? (
-                         <div>
-                           <h5 className="fw-bold mb-4 text-dark">
-                             Establece el precio de tu actividad
-                           </h5>
-                           
-                           <h6 className="fw-bold mb-4 text-dark">
-                             Participante
-                           </h6>
-                           
+                       <div>
+                         <h5 className="fw-bold mb-4 text-dark">
+                           Establece el precio de tu actividad
+                         </h5>
+                         
+                         <h6 className="fw-bold mb-4 text-dark">
+                           Participante
+                         </h6>
+                         
                            {/* Rango total de personas */}
                            {availabilityPricingMode?.pricingMode === 'PER_PERSON' && apiCapacity && (
                              <div className="mb-3">
-                               <div className="d-flex align-items-center">
+                             <div className="d-flex align-items-center">
                                  <span className="text-muted me-2">
                                    Rango de personas: {apiCapacity.groupMinSize} a {apiCapacity.groupMaxSize || 'Ilimitado'}
                                  </span>
-                                 <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
-                               </div>
+                               <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
                              </div>
+                           </div>
                            )}
                            
                            {/* Headers de la tabla */}
@@ -1870,8 +1870,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                              </div>
                              <div className="col-md-2">
                                <label className="form-label text-muted fw-bold">
-                                 El cliente paga
-                               </label>
+                               El cliente paga
+                             </label>
                              </div>
                              <div className="col-md-2">
                                <label className="form-label text-muted fw-bold">
@@ -1919,44 +1919,44 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                
                                <div className="col-md-2">
                                  <div className="input-group">
-                                   <input
-                                     type="text"
-                                     className="form-control"
+                             <input
+                               type="text"
+                               className="form-control"
                                      placeholder="0"
                                      value={level.clientPays}
                                      onChange={(e) => handlePricingLevelChange(level.id, 'clientPays', e.target.value)}
-                                   />
+                             />
                                    <span className="input-group-text">
                                      {(currency || 'USD').toUpperCase()}
                                    </span>
                                  </div>
-                               </div>
-                               
+                           </div>
+                           
                                <div className="col-md-2">
-                                 <input
-                                   type="text"
-                                   className="form-control"
+                             <input
+                               type="text"
+                               className="form-control"
                                    value={`${appConfig.pricing.defaultCommissionPercentage}%`}
-                                   readOnly
+                               readOnly
                                    disabled
-                                 />
-                               </div>
-                               
+                             />
+                           </div>
+                           
                                <div className="col-md-2">
                                  <div className="input-group">
-                                   <input
-                                     type="text"
-                                     className="form-control"
+                             <input
+                               type="text"
+                               className="form-control"
                                      placeholder="0.00"
                                      value={level.pricePerPerson}
                                      readOnly
                                      disabled
-                                   />
+                             />
                                    <span className="input-group-text">
                                      {(currency || 'USD').toUpperCase()}
                                    </span>
-                                 </div>
-                               </div>
+                           </div>
+                         </div>
 
                                {/* Columna de Acciones */}
                                <div className="col-md-2">
@@ -1977,20 +1977,20 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
                              </div>
                            ))}
-                           
-                           <div className="mt-4">
-                             <button 
-                               type="button" 
+                         
+                         <div className="mt-4">
+                           <button 
+                             type="button" 
                                className="btn btn-primary d-flex align-items-center"
                                onClick={handleAddPricingLevel}
-                             >
-                               <i className="fas fa-plus me-2"></i>
-                               Precio por nivel
-                             </button>
-                           </div>
+                           >
+                             <i className="fas fa-plus me-2"></i>
+                             Precio por nivel
+                           </button>
                          </div>
+                       </div>
                        ) : (
-                         <div>
+                        <div>
                            <div className="text-center py-5">
                              <div className="text-muted">
                                <i className="fas fa-info-circle fa-3x mb-3"></i>
@@ -1998,59 +1998,59 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                <p className="text-muted">
                                  La configuración de precios solo está disponible cuando el modo de precios es "Por persona".
                                </p>
-                             </div>
-                           </div>
-                         </div>
-                       )
-                     ) : (
-                        // Error para valores de step no válidos
-                        <div className="mb-5">
-                                                  <div className="text-danger border-0">
-                          <div className="d-flex align-items-center">
-                            <i className="fas fa-exclamation-triangle me-3 text-danger"></i>
-                            <div>
-                              <h5 className="alert-heading text-danger mb-2">
-                                Paso no válido
-                              </h5>
-                              <p className="mb-0 text-danger">
-                                El valor del paso "{currentStep}" no es válido. Solo se permiten pasos del 1 al 4.
-                              </p>
                             </div>
                           </div>
                         </div>
+                       )
+                      ) : (
+                        // Error para valores de step no válidos
+                        <div className="mb-5">
+                                                  <div className="text-danger border-0">
+                            <div className="d-flex align-items-center">
+                              <i className="fas fa-exclamation-triangle me-3 text-danger"></i>
+                              <div>
+                                <h5 className="alert-heading text-danger mb-2">
+                                  Paso no válido
+                                </h5>
+                                <p className="mb-0 text-danger">
+                                El valor del paso "{currentStep}" no es válido. Solo se permiten pasos del 1 al 4.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                 {/* Botones de navegación */}
                 {currentStep !== 2 && (
-                  <div className="d-flex justify-content-between mt-5">
-                    <button 
-                      type="button" 
-                      className="btn btn-outline-primary"
-                      onClick={handleBack}
-                    >
-                      <i className="fas fa-arrow-left me-2"></i>
-                      {getTranslation('stepSchedule.buttons.back', language)}
-                    </button>
-                    
-                    <button 
-                      type="button" 
-                      className="btn btn-primary"
-                      onClick={handleSaveAndContinue}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Guardando...
-                        </>
-                      ) : (
-                        <>
-                          {getTranslation('stepSchedule.buttons.saveAndContinue', language)}
-                          <i className="fas fa-arrow-right ms-2"></i>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                <div className="d-flex justify-content-between mt-5">
+                  <button 
+                    type="button" 
+                    className="btn btn-outline-primary"
+                    onClick={handleBack}
+                  >
+                    <i className="fas fa-arrow-left me-2"></i>
+                    {getTranslation('stepSchedule.buttons.back', language)}
+                  </button>
+                  
+                                     <button 
+                     type="button" 
+                     className="btn btn-primary"
+                     onClick={handleSaveAndContinue}
+                     disabled={isSaving}
+                   >
+                     {isSaving ? (
+                       <>
+                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                         Guardando...
+                       </>
+                     ) : (
+                       <>
+                         {getTranslation('stepSchedule.buttons.saveAndContinue', language)}
+                         <i className="fas fa-arrow-right ms-2"></i>
+                       </>
+                     )}
+                   </button>
+                </div>
                 )}
               </div>
             </div>

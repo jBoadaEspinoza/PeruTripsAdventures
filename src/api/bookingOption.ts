@@ -2,21 +2,100 @@ import { apiGet } from './apiConfig';
 import { apiPost } from './apiConfig';
 import { getRuc } from '../utils/configUtils';
 
+export interface BookingOption {
+    id: string;
+    title: string;
+    durationDays: number;
+    durationHours: number;
+    durationMinutes: number;
+    groupMinSize: number;
+    groupMaxSize: number | null;
+    isPrivate: boolean;
+    meetingType: string;
+    pickupPoints: PickupPoint[];
+    pickupNotificationWhen: string;
+    pickupTimeOption: string;
+    dropoffType: string;
+    transportModeId: number;
+    languages: string[];
+    pricingMode: string;
+    availabilityMode: string;
+    isOpenDuration: boolean;
+    defaultCutoffMinutes: number;
+    lastMinuteAfterFirst: boolean;
+    isActive: boolean;
+    schedules: Schedule[];
+    priceTiers: PriceTier[];
+  }
+  
+  export interface PickupPoint {
+    id: number;
+    city: City;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    notes: string | null;
+  }
+  
+  export interface City {
+    id: number;
+    cityName: string;
+    cityLatitude: number | null;
+    cityLongitude: number | null;
+    countryId: string;
+    imageUrl: string;
+    isActive: boolean | null;
+  }
+  
+  export interface Schedule {
+    id: number;
+    title: string;
+    dayOfWeek: number;
+    seasonStartDate: string;
+    seasonEndDate: string | null;
+    startTime: string;
+    endTime: string | null;
+    isActive: boolean;
+  }
+  
+  export interface PriceTier {
+    id: number;
+    minParticipants: number;
+    maxParticipants: number | null;
+    totalPrice: number;
+    pricePerParticipant: number;
+    commissionPercent: number;
+    currency: string;
+  }
+
+export interface CutOffTimeRequest{
+    timeSlot: string;
+    cutOffMinutes: number;
+}
+
+export interface BookingOptionCreateCutOffRequest{
+    activityId: string;
+    bookingOptionId: string;
+    defaultCutOffMinutes: number;
+    isLastMinutesAfterFirst: boolean;
+    cutOffTimesRequest: CutOffTimeRequest[];
+}
 
 export interface BookingOptionCreateAvailabilityPricingPricePerPersonRequest {
     activityId: string;
     bookingOptionId: string;
     bookingPriceTiers: BookingPriceTierRequest[];
-  }
+}
   
-  export interface BookingPriceTierRequest {
+export interface BookingPriceTierRequest {
     minParticipants: number;
     maxParticipants: number | null;
     totalPrice: number;
     commissionPercent: number;
     pricePerParticipant: number;
     currency: string;
-  }
+}
 
 export interface BookingOptionCreateAvailabilityPricingCapacityRequest{
     activityId: string;
@@ -126,11 +205,9 @@ export interface CreateBookingOptionSetupRequest{
     bookingOptionId: string;       
     title: string;                 
     maxGroupSize?: number | null;  
-
     guideLanguages: string[];      
     isPrivate: boolean;            
     isOpenDuration: boolean;       
-
     durationDays?: number | null;
     durationHours?: number | null;
     durationMinutes?: number | null;
@@ -165,6 +242,46 @@ export interface CreateBookingOptionAvailabilityPricingPricePerPersonResponse{
     success: boolean;
     message: string;
     idCreated: string;
+}
+
+export interface IsBookingOptionAvailabilityPricingCompletedResponse{
+    success: boolean;
+    successCode: string;
+    message: string;
+    data?: {
+        isComplete: boolean;
+    };
+}
+
+export interface ListOfTimeSlotsResponse {
+    success: boolean;
+    successCode: string;
+    message: string;
+    data: {
+        title: string;
+        startDate: string;
+        timeSlots: TimeSlot[];
+    };
+}
+
+export interface TimeSlot {
+    id: string;
+    departureTime: string;
+    cutOffTime: string;
+    isActive: boolean;
+}
+
+export interface CreateBookingOptionCutOffRequestResponse{
+    success: boolean;
+    message: string;
+    idCreated: string;
+}
+
+export interface BookingOptionResponse{
+    success: boolean;
+    successCode: string;
+    message: string;
+    data: BookingOption[];
 }
 
 export const bookingOptionApi = {
@@ -390,5 +507,156 @@ export const bookingOptionApi = {
                 idCreated: ''
             }
         }
+    },
+    isBookingOptionAvailabilityPricingCompleted: async (bookingOptionId: string): Promise<IsBookingOptionAvailabilityPricingCompletedResponse> => {
+        try {
+            const response = await apiGet<IsBookingOptionAvailabilityPricingCompletedResponse>(`/booking-options/${bookingOptionId}/isAvailabilityPricing`);
+            
+            // Validar que la respuesta tenga la estructura correcta según la imagen
+            if (response && typeof response === 'object') {
+                // Verificar que tenga los campos exactos de la respuesta esperada
+                if ('success' in response && 'successCode' in response && 'message' in response) {
+                    // Si success es true y successCode es AVAILABILITY_PRICING_STATUS_CHECKED, significa que se completó
+                    if (response.success === true && response.successCode === 'AVAILABILITY_PRICING_STATUS_CHECKED') {
+                        // Verificar también que data.isComplete sea true para confirmar que realmente se completó
+                        if (response.data && response.data.isComplete === true) {
+                            return response as IsBookingOptionAvailabilityPricingCompletedResponse;
+                        }
+                    }
+                    // Si success es false, significa que no se completó
+                    if (response.success === false) {
+                    return response as IsBookingOptionAvailabilityPricingCompletedResponse;
+                    }
+                }
+            }
+            
+            // Si la respuesta no tiene la estructura esperada, verificar si está en data
+            const responseAny = response as any;
+            if (responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data) {
+                const dataResponse = responseAny.data;
+                if ('success' in dataResponse && 'successCode' in dataResponse && 'message' in dataResponse) {
+                    // Si success es true y successCode es AVAILABILITY_PRICING_STATUS_CHECKED, significa que se completó
+                    if (dataResponse.success === true && dataResponse.successCode === 'AVAILABILITY_PRICING_STATUS_CHECKED') {
+                        // Verificar también que data.isComplete sea true
+                        if (dataResponse.data && dataResponse.data.isComplete === true) {
+                            return dataResponse as IsBookingOptionAvailabilityPricingCompletedResponse;
+                        }
+                    }
+                    // Si success es false, significa que no se completó
+                    if (dataResponse.success === false) {
+                        return dataResponse as IsBookingOptionAvailabilityPricingCompletedResponse;
+                    }
+                }
+            }
+        
+            // Si no se puede determinar la estructura, retornar error genérico
+            return {
+                success: false,
+                successCode: 'UNKNOWN_ERROR',
+                message: 'Respuesta del servidor no válida - estructura esperada: { success: true, successCode: "AVAILABILITY_PRICING_STATUS_CHECKED", message, data: { isComplete: true } }'
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                successCode: 'NETWORK_ERROR',
+                message: 'Error de conexión al verificar el estado de disponibilidad y precios'
+            };
+        }
+    },
+    getListOfTimeSlots: async (bookingOptionId: string): Promise<ListOfTimeSlotsResponse> => {
+        try {
+            const response = await apiGet<ListOfTimeSlotsResponse>(`/booking-options/${bookingOptionId}/listTimeSlots`);
+            
+            // Validar que la respuesta tenga la estructura correcta
+            if (response && typeof response === 'object') {
+                // Verificar que tenga los campos exactos de la respuesta esperada
+                if ('success' in response && 'successCode' in response && 'message' in response && 'data' in response) {
+                    if (response.success === true && response.successCode === 'TIME_SLOTS_LISTED') {
+                        return response as ListOfTimeSlotsResponse;
+                    }
+                }
+            }
+            
+            // Si la respuesta no tiene la estructura esperada, verificar si está en data
+            const responseAny = response as any;
+            if (responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data) {
+                const dataResponse = responseAny.data;
+                if ('success' in dataResponse && 'successCode' in dataResponse && 'message' in dataResponse && 'data' in dataResponse) {
+                    if (dataResponse.success === true && dataResponse.successCode === 'TIME_SLOTS_LISTED') {
+                        return dataResponse as ListOfTimeSlotsResponse;
+                    }
+                }
+            }
+            
+            // Si no se puede determinar la estructura, retornar error genérico
+            return {
+                success: false,
+                successCode: 'UNKNOWN_ERROR',
+                message: 'Respuesta del servidor no válida - estructura esperada: { success: true, successCode: "TIME_SLOTS_RETRIEVED", message, data: { timeSlots: [...] } }',
+                data: {
+                    title: '',
+                    startDate: '',
+                    timeSlots: []
+                }
+            };
+        } catch (error: any) {
+            console.error('Booking Option API: Error getting list of time slots:', error);
+            return {
+                success: false,
+                successCode: 'NETWORK_ERROR',
+                message: 'Error de conexión al obtener la lista de franjas horarias',
+                data: {
+                    title: '',
+                    startDate: '',
+                    timeSlots: []
+                }
+            };
+        }
+    },
+    createCutOffRequest: async (request: BookingOptionCreateCutOffRequest): Promise<CreateBookingOptionCutOffRequestResponse> => {
+        try {
+            const response = await apiPost<CreateBookingOptionCutOffRequestResponse>('/booking-options/createCutOffTime', request);
+            if(response && typeof response === 'object'){
+                if('success' in response && 'idCreated' in response){
+                    return response as CreateBookingOptionCutOffRequestResponse;
+                }
+            }
+            const responseAny = response as any;
+            if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+                return responseAny.data as CreateBookingOptionCutOffRequestResponse;
+            }
+            return response;
+        } catch (error: any) {
+            console.error('Booking Option API: Error creating booking option cut off request:', error);
+            return {
+                success: false,
+                message: 'Error al crear la opción de reserva',
+                idCreated: ''
+            }
+        }
+    },
+    getBookingOption: async (activityId: string, language: string, currency: string): Promise<BookingOptionResponse> => {
+        try {
+            const response = await apiGet<BookingOptionResponse>(`/booking-options/search?activityId=${activityId}&language=${language}&currency=${currency}`);
+            if(response && typeof response === 'object'){
+                if('success' in response && 'successCode' in response && 'message' in response && 'data' in response){
+                    return response as BookingOptionResponse;
+                }
+            }
+            const responseAny = response as any;
+            if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+                return responseAny.data as BookingOptionResponse;
+            }
+            return response;
+        } catch (error: any) {
+            console.error('Booking Option API: Error getting booking option:', error);
+            return {
+                success: false,
+                successCode: 'NETWORK_ERROR',
+                message: 'Error de conexión al obtener la opción de reserva',
+                data: []
+            }
+        }
     }
+
 }

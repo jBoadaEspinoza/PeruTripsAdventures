@@ -63,11 +63,35 @@ const OptionSetupLayout: React.FC<{
     }
   }, [activityId, language, isAuthenticated]);
 
-  // Solo redirigir si no está autenticado
+  // Solo redirigir si no está autenticado y no hay token válido
   React.useEffect(() => {
     if (isInitialized && !isValidating && !isAuthenticated) {
-      console.log('OptionSetupLayout: Usuario no autenticado, redirigiendo a login');
-      navigate('/extranet/login');
+      // Verificar si hay un token en localStorage antes de redirigir
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        console.log('OptionSetupLayout: No hay token, redirigiendo a login');
+        navigate('/extranet/login');
+      } else {
+        // Si hay token pero no está autenticado, intentar validar una vez más
+        console.log('OptionSetupLayout: Hay token pero no autenticado, validando...');
+        // No redirigir inmediatamente, dejar que useExtranetAuth maneje la validación
+      }
+    }
+  }, [isAuthenticated, isInitialized, isValidating, navigate]);
+
+  // Efecto adicional para manejar redirección solo cuando el token esté realmente expirado
+  React.useEffect(() => {
+    if (isInitialized && !isValidating && !isAuthenticated) {
+      // Esperar un poco más antes de redirigir para dar tiempo a la validación
+      const timeoutId = setTimeout(() => {
+        const authToken = localStorage.getItem('authToken');
+        if (!authToken && !isAuthenticated) {
+          console.log('OptionSetupLayout: Token expirado confirmado, redirigiendo a login');
+          navigate('/extranet/login');
+        }
+      }, 2000); // Esperar 2 segundos antes de redirigir
+
+      return () => clearTimeout(timeoutId);
     }
   }, [isAuthenticated, isInitialized, isValidating, navigate]);
 
