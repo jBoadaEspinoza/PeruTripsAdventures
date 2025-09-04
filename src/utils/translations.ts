@@ -782,6 +782,10 @@ export const translations: Translations = {
     es: 'Continuar',
     en: 'Continue'
   },
+  'common.skip': {
+    es: 'Omitir',
+    en: 'Skip'
+  },
 
   // Step Category
   'stepCategory.title': {
@@ -1305,6 +1309,9 @@ export const translations: Translations = {
   'stepOptions.actions.activate': { es: 'Activar opción', en: 'Activate option' },
   'stepOptions.actions.deactivate': { es: 'Desactivar opción', en: 'Deactivate option' },
   'stepOptions.actions.delete': { es: 'Eliminar opción', en: 'Delete option' },
+  'stepOptions.warning.activeOption': { es: 'No se puede crear una nueva opción mientras hay una opción activa. Desactiva la opción actual para crear una nueva.', en: 'Cannot create a new option while there is an active option. Deactivate the current option to create a new one.' },
+  'stepOptions.button.disabledTitle': { es: 'No se puede crear una nueva opción mientras hay una opción activa', en: 'Cannot create a new option while there is an active option' },
+  'stepOptions.button.enabledTitle': { es: 'Crear nueva opción de reserva', en: 'Create new booking option' },
 
   // Create Option Modal
   'createOptionModal.title': { es: 'Crear nueva opción', en: 'Create new option' },
@@ -1364,8 +1371,48 @@ export const translations: Translations = {
   // Step Itinerary
   'stepItinerary.title': { es: 'Creador de itinerarios', en: 'Itinerary creator' },
   'stepItinerary.description': { es: 'Crea el itinerario detallado de tu actividad', en: 'Create the detailed itinerary for your activity' },
-  'stepItinerary.placeholder.title': { es: 'Paso en desarrollo', en: 'Step in development' },
-  'stepItinerary.placeholder.description': { es: 'Este paso será implementado próximamente. Aquí podrás crear el itinerario detallado de tu actividad.', en: 'This step will be implemented soon. Here you will be able to create the detailed itinerary for your activity.' },
+  'stepItinerary.welcome.title': { es: 'Bienvenido a nuestro nuevo creador de itinerarios.', en: 'Welcome to our new itinerary creator.' },
+  'stepItinerary.welcome.description1': { es: 'Un itinerario visual muestra a los clientes exactamente dónde irán y qué harán durante la actividad.', en: 'A visual itinerary shows clients exactly where they will go and what they will do during the activity.' },
+  'stepItinerary.welcome.description2': { es: 'Son rápidos y fáciles de configurar y las actividades que los incluyen reciben hasta un 25% más de reservas ¡Eso significa más clientes y más dinero en tu bolsillo!', en: 'They are quick and easy to configure, and activities that include them receive up to 25% more bookings! That means more clients and more money in your pocket!' },
+  'stepItinerary.welcome.description3': { es: 'Esta es nuestra primera versión, pero vendrán más. Estamos mejorando nuestro creador de itinerarios continuamente.', en: 'This is our first version, but more will come. We are continuously improving our itinerary creator.' },
+  'stepItinerary.welcome.description4': { es: 'Gracias, y ¡a crear se ha dicho!', en: 'Thank you, and let\'s get creating!' },
+  'stepItinerary.createItinerary': { es: 'Crear itinerario', en: 'Create itinerary' },
+  'stepItinerary.continueCreating': { es: 'Seguir creando', en: 'Continue creating' },
+  'stepItinerary.example.title': { es: 'Ejemplo de cómo ven los clientes un itinerario visual.', en: 'Example of how clients see a visual itinerary.' },
+  'stepItinerary.day.title': { es: 'Día {dayNumber}', en: 'Day {dayNumber}' },
+  'stepItinerary.day.titlePlaceholder': { es: 'Ej: Lugar de recogida: Edinburgh', en: 'Ex: Pickup location: Edinburgh' },
+  'stepItinerary.day.descriptionPlaceholder': { es: 'Ej: Bus ride (1h30min)', en: 'Ex: Bus ride (1h30min)' },
+  'stepItinerary.addDay': { es: 'Añadir día', en: 'Add day' },
+  'stepItinerary.removeDay': { es: 'Eliminar día', en: 'Remove day' },
+  'stepItinerary.noDays': { es: 'No hay días agregados al itinerario. Haz clic en "Añadir día" para comenzar.', en: 'No days added to the itinerary. Click "Add day" to start.' },
+  'stepItinerary.saveAndExit': { es: 'Guardar y salir', en: 'Save and exit' },
+  'stepItinerary.addActivity': { es: 'Añadir actividad', en: 'Add activity' },
+  'stepItinerary.addTransfer': { es: 'Añadir traslado', en: 'Add transfer' },
+  'stepItinerary.activityType.title': { es: '¿Qué sucede durante esta parte de la experiencia?', en: 'What happens during this part of the experience?' },
+  'stepItinerary.activityType.instructions': { es: 'Indica lo que sucede durante esta parte de tu experiencia en la barra de búsqueda a continuación.', en: 'Indicate what happens during this part of your experience in the search bar below.' },
+  'stepItinerary.activityType.placeholder': { es: 'Introduce la actividad aquí', en: 'Enter the activity here' },
+  'stepItinerary.activityType.selectFromList': { es: '• Seleccionar de la lista', en: '• Select from the list' },
+  'stepItinerary.activityType.class': { es: 'Clase', en: 'Class' },
+  'stepItinerary.activityType.safetyInfo': { es: 'Información de seguridad', en: 'Safety information' },
+  'stepItinerary.activityType.selfGuidedTour': { es: 'Tour autoguiado', en: 'Self-guided tour' },
+  'stepItinerary.activityType.overnightStay': { es: 'Pernoctación', en: 'Overnight stay' },
+  'stepItinerary.activityType.stopovers': { es: 'Lugares de paso', en: 'Places of passage' },
+  'stepItinerary.location.title': { es: '¿Dónde tiene lugar esta parte de tu experiencia?', en: 'Where does this part of your experience take place?' },
+  'stepItinerary.location.instructions': { es: 'Selecciona una de las ubicaciones etiquetadas en tu experiencia de la siguiente lista o utiliza una ubicación no específica.', en: 'Select one of the tagged locations in your experience from the following list or use a non-specific location.' },
+  'stepItinerary.location.placeholder': { es: 'Selecciona una ubicación', en: 'Select a location' },
+  'stepItinerary.duration.title': { es: '¿Cuánto dura esta parte de la experiencia?', en: 'How long does this part of the experience last?' },
+  'stepItinerary.duration.instructions': { es: 'Añade una duración para esta parte de la experiencia. También puedes omitir este paso si no quieres mostrar una duración para este segmento del itinerario (por ejemplo, atracciones por las que pasas con un vehículo en movimiento, etc.).', en: 'Add a duration for this part of the experience. You can also skip this step if you don\'t want to show a duration for this segment of the itinerary (for example, attractions you pass by in a moving vehicle, etc.).' },
+  'stepItinerary.duration.hours': { es: 'Horas', en: 'Hours' },
+  'stepItinerary.duration.minutes': { es: 'Minutos', en: 'Minutes' },
+  'stepItinerary.vehicleType.title': { es: '¿Qué tipo de vehículo se utiliza para el traslado?', en: 'What type of vehicle is used for the transfer?' },
+  'stepItinerary.vehicleType.instructions': { es: 'Añade el tipo de vehículo utilizado para el traslado en la barra de búsqueda.', en: 'Add the type of vehicle used for the transfer in the search bar.' },
+  'stepItinerary.vehicleType.placeholder': { es: 'Elige el tipo de vehículo aquí.', en: 'Choose the type of vehicle here.' },
+  'stepItinerary.next': { es: 'Siguiente', en: 'Next' },
+  'stepItinerary.back': { es: 'Atrás', en: 'Back' },
+  'stepItinerary.skip': { es: 'Saltar', en: 'Skip' },
+  'stepItinerary.close': { es: 'Cerrar', en: 'Close' },
+  'stepItinerary.visualTimeline': { es: 'Itinerario visual', en: 'Visual itinerary' },
+  'stepItinerary.itinerarySummary': { es: 'Resumen del Itinerario', en: 'Itinerary Summary' },
 
   // Activity Creation Layout
   'activityCreation.navigation.title': {

@@ -7,6 +7,7 @@ import { useAppSelector, useAppDispatch } from '../../../redux/store';
 import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import CreateOptionModal from '../../../components/CreateOptionModal';
 import { bookingOptionApi } from '../../../api/bookingOption';
+import { useCurrency } from '../../../context/CurrencyContext';
 
 interface BookingOption {
   id: string;
@@ -23,6 +24,7 @@ interface BookingOption {
 const StepOptions: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { currency } = useCurrency();
   const dispatch = useAppDispatch();
   const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
   
@@ -30,6 +32,7 @@ const StepOptions: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [newOption, setNewOption] = useState<Partial<BookingOption>>({
     title: '',
     duration: '',
@@ -51,6 +54,26 @@ const StepOptions: React.FC = () => {
       navigate('/extranet/activity/createCategory');
     }
   }, [activityId, navigate]);
+
+  useEffect(() => {
+    if (activityId) {
+      const fetchBookingOptions = async () => {
+        try {
+          setIsLoading(true);
+          const response = await bookingOptionApi.searchBookingOptions(activityId, language, currency);
+          if(response.success && response.data){
+            setOptions(response.data);
+          }
+        } catch (error) {
+          console.error('Error fetching booking options:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchBookingOptions();
+    }
+  }, [activityId, language, currency]);
 
   const handleCreateOption = async () => {
     if (newOption.title?.trim()) {
@@ -139,8 +162,10 @@ const StepOptions: React.FC = () => {
   };
 
   const handleContinue = () => {
-    if (options.length === 0) {
-      // Mostrar mensaje de que necesita al menos una opción
+    const activeOptions = options.filter(option => option.isActive);
+    if (activeOptions.length === 0) {
+      // Se redirecciona a la pagina StepItinerary 
+      navigate('/extranet/activity/createItinerary');
       return;
     }
     navigate('/extranet/activity/createItinerary');
@@ -197,10 +222,21 @@ const StepOptions: React.FC = () => {
                     type="button"
                     className="btn btn-outline-primary"
                     onClick={() => setShowCreateModal(true)}
+                    disabled={options.some(option => option.isActive)}
+                    title={options.some(option => option.isActive) ? 
+                      getTranslation('stepOptions.button.disabledTitle', language) : 
+                      getTranslation('stepOptions.button.enabledTitle', language)
+                    }
                   >
                     <i className="fas fa-plus me-2"></i>
                     {getTranslation('stepOptions.createNewOption', language)}
                   </button>
+                  {options.some(option => option.isActive) && (
+                    <div className="form-text text-warning mt-1">
+                      <i className="fas fa-info-circle me-1"></i>
+                      {getTranslation('stepOptions.warning.activeOption', language)}
+                    </div>
+                  )}
                 </div>
 
                 {/* Formulario para crear opción */}
@@ -416,12 +452,12 @@ const StepOptions: React.FC = () => {
               <i className="fas fa-arrow-left me-2"></i>
               {getTranslation('common.back', language)}
             </button>
-            
+            {/* Botón continuar habilitado solo si hay opciones activas */}
             <button
               type="button"
               className="btn btn-primary"
               onClick={handleContinue}
-              disabled={options.length === 0}
+              disabled={isLoading || options.filter(option => option.isActive).length === 0}
             >
               {getTranslation('common.continue', language)}
               <i className="fas fa-arrow-right ms-2"></i>

@@ -635,7 +635,7 @@ export const bookingOptionApi = {
             }
         }
     },
-    getBookingOption: async (activityId: string, language: string, currency: string): Promise<BookingOptionResponse> => {
+    searchBookingOptions: async (activityId: string, language: string, currency: string): Promise<BookingOptionResponse> => {
         try {
             const response = await apiGet<BookingOptionResponse>(`/booking-options/search?activityId=${activityId}&language=${language}&currency=${currency}`);
             if(response && typeof response === 'object'){
