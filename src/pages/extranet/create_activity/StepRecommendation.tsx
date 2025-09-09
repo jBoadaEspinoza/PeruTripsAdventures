@@ -1,42 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepRecommendation: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
+  const hasRedirected = useRef(false);
+  const [activityData, setActivityData] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<string[]>(['', '', '']); // Initialize with 3 empty fields
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
 
-  // Set current step when component mounts
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(4)); // StepRecommendation is step 4
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+        
+        // Cargar recomendaciones si existen
+        if (activityData && activityData.recommendations) {
+          if (Array.isArray(activityData.recommendations)) {
+            // Asegurar que siempre tengamos al menos 3 campos
+            const loadedRecommendations = [...activityData.recommendations];
+            while (loadedRecommendations.length < 3) {
+              loadedRecommendations.push('');
+            }
+            setRecommendations(loadedRecommendations);
+          } else {
+            setRecommendations(['', '', '']);
+          }
+        }
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
 
   useEffect(() => {
-    // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepRecommendation: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    // Solo redirigir si no hay activityId y no se ha redirigido antes
+    if (!activityId && !hasRedirected.current){
+        hasRedirected.current = true;
+        navigate('/extranet/login');
+      } else if (activityId) {
+        hasRedirected.current = false;
     }
-  }, [activityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepRecommendation - ActivityId:', activityId);
-    console.log('StepRecommendation - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
+  }, [activityId, navigate, lang, currency]);
 
   const addRecommendation = () => {
     setRecommendations([...recommendations, '']);
@@ -54,6 +74,33 @@ const StepRecommendation: React.FC = () => {
     const newRecommendations = [...recommendations];
     newRecommendations[index] = value;
     setRecommendations(newRecommendations);
+  };
+
+  const handleSaveAndExit = async () => {
+    const validRecommendations = recommendations.filter(rec => rec.trim().length > 0);
+    
+    if (validRecommendations.length < 3) {
+      setError(getTranslation('stepRecommend.error.minimumThreeRequired', language));
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        // Call createRecommendations API
+        const response = await activitiesApi.createRecommendations({
+          id: activityId!,
+          recommendations: validRecommendations,
+          lang: language
+        });
+        if (response.success) {
+          navigate('/extranet/dashboard');
+        } else {
+          setError(response.message || getTranslation('stepRecommend.error.saveFailed', language));
+        }
+      } catch (error) {
+        setError(getTranslation('stepRecommend.error.saveFailed', language));
+      }
+    }, 'save-loading');
   };
 
   const handleContinue = async () => {
@@ -75,19 +122,28 @@ const StepRecommendation: React.FC = () => {
 
         if (response.success) {
           // Navigate to next step (StepRestriction)
-          navigate('/extranet/activity/createRestrictions');
+          navigateToActivityStep(navigate, '/extranet/activity/createRestrictions', {
+            activityId,
+            lang,
+            currency,
+            currentStep:5
+          });
         } else {
           setError(response.message || getTranslation('stepRecommend.error.saveFailed', language));
         }
       } catch (error) {
-        console.error('Error saving recommendations:', error);
         setError(getTranslation('stepRecommend.error.saveFailed', language));
       }
     }, 'save-loading');
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createDescription');
+    navigateToActivityStep(navigate, '/extranet/activity/createDescription', {
+      activityId,
+      lang,
+      currency,
+      currentStep:3
+    });
   };
 
   return (
@@ -189,7 +245,7 @@ const StepRecommendation: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
               >
                 {getTranslation('stepRecommend.saveAndExit', language)}
               </button>

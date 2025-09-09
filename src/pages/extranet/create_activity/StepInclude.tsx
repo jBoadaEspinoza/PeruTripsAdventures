@@ -1,42 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepInclude: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
+  const hasRedirected = useRef(false);
+  const [activityData, setActivityData] = useState<any>(null);
   const [inclusions, setInclusions] = useState<string[]>(['', '', '']); // Initialize with 3 empty fields
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
-
-  // Set current step when component mounts
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
+ 
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(6)); // StepInclude is step 6
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+
+        // Cargar inclusions si existen
+        if (activityData && activityData.includes) {
+          if (Array.isArray(activityData.includes)) {
+            // Asegurar que siempre tengamos al menos 3 campos
+            const loadedInclusions = [...activityData.includes];
+            while (loadedInclusions.length < 3) {
+              loadedInclusions.push('');
+            }
+            setInclusions(loadedInclusions);
+          } else {
+            setInclusions([]);
+          }
+        }
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
 
   useEffect(() => {
     // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepInclude: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    } else if (activityId) {
+      hasRedirected.current = false;
     }
   }, [activityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepInclude - ActivityId:', activityId);
-    console.log('StepInclude - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
 
   const addInclusion = () => {
     setInclusions([...inclusions, '']);
@@ -54,6 +74,32 @@ const StepInclude: React.FC = () => {
     const newInclusions = [...inclusions];
     newInclusions[index] = value;
     setInclusions(newInclusions);
+  };
+
+  const handleSaveAndExit = async () => {
+    const validInclusions = inclusions.filter(inc => inc.trim().length > 0);
+    if (validInclusions.length === 0) {
+      setError(getTranslation('stepInclude.error.emptyInclusionsNotAllowed', language));
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        // Call createIncludes API
+        const response = await activitiesApi.createIncludes({
+          id: activityId!,
+          inclusions: validInclusions,
+          lang: language
+        });
+        if (response.success) {
+          navigate('/extranet/dashboard');
+        } else {
+          setError(response.message || getTranslation('stepInclude.error.saveFailed', language));
+        }
+      } catch (error) {
+        setError(getTranslation('stepInclude.error.saveFailed', language));
+      }
+    }, 'save-loading');
   };
 
   const handleContinue = async () => {
@@ -75,7 +121,12 @@ const StepInclude: React.FC = () => {
 
         if (response.success) {
           // Navigate to next step (StepNotInclude)
-          navigate('/extranet/activity/createNotIncluded');
+          navigateToActivityStep(navigate, '/extranet/activity/createNotIncluded', {
+            activityId,
+            lang,
+            currency,
+            currentStep:7
+          });
         } else {
           setError(response.message || getTranslation('stepInclude.error.saveFailed', language));
         }
@@ -87,7 +138,12 @@ const StepInclude: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createRestrictions');
+    navigateToActivityStep(navigate, '/extranet/activity/createRestrictions', {
+      activityId,
+      lang,
+      currency,
+      currentStep:5
+    });
   };
 
   return (
@@ -189,7 +245,7 @@ const StepInclude: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
               >
                 {getTranslation('stepInclude.saveAndExit', language)}
               </button>

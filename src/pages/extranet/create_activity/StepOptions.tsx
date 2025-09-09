@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import CreateOptionModal from '../../../components/CreateOptionModal';
 import { bookingOptionApi } from '../../../api/bookingOption';
 import { useCurrency } from '../../../context/CurrencyContext';
@@ -26,8 +27,8 @@ const StepOptions: React.FC = () => {
   const { language } = useLanguage();
   const { currency } = useCurrency();
   const dispatch = useAppDispatch();
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
-  
+  const { activityId, lang, currency: urlCurrency, currentStep } = useActivityParams();
+  const hasRedirected = useRef(false);
   const [options, setOptions] = useState<BookingOption[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -44,14 +45,15 @@ const StepOptions: React.FC = () => {
     isActive: true
   });
 
-  useEffect(() => {
-    dispatch(setCurrentStep(9)); // StepOptions is step 9
-  }, [dispatch]);
+  // No need to set current step in Redux anymore, it comes from URL
 
   useEffect(() => {
-    if (!activityId) {
-      console.log('StepOptions: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    // Verificar que tenemos activityId antes de continuar
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    } else if (activityId) {
+      hasRedirected.current = false;
     }
   }, [activityId, navigate]);
 
@@ -137,7 +139,12 @@ const StepOptions: React.FC = () => {
 
         if (response.success && response.idCreated) {
           // Navegar a StepOptionSetup con el optionId en la URL
-          navigate(`/extranet/activity/createOptionSetup?optionId=${response.idCreated}`);
+          navigateToActivityStep(navigate, `/extranet/activity/createOptionSetup?activityId=${activityId}&optionId=${response.idCreated}&lang=${lang}&currency=${urlCurrency}&currentStep=${currentStep}`, {
+            activityId,
+            lang,
+            currency: urlCurrency,
+            currentStep:9
+          });
         } else {
           console.error('Error al crear la opción:', response.message);
           // Aquí podrías mostrar un mensaje de error al usuario
@@ -155,24 +162,43 @@ const StepOptions: React.FC = () => {
     setOptions(options.filter(opt => opt.id !== id));
   };
 
-  const handleToggleOption = (id: string) => {
-    setOptions(options.map(opt => 
-      opt.id === id ? { ...opt, isActive: !opt.isActive } : opt
-    ));
+  const handleEditOption = (id: string) => {
+     // Redirigir a la pagina StepOptionSetup con el optionId en la URL
+     navigateToActivityStep(navigate, `/extranet/activity/createOptionSetup?activityId=${activityId}&optionId=${id}&lang=${lang}&currency=${urlCurrency}&currentStep=${currentStep}`, {
+      activityId,
+      lang,
+      currency: urlCurrency,
+      currentStep: 9
+    });
   };
 
   const handleContinue = () => {
     const activeOptions = options.filter(option => option.isActive);
     if (activeOptions.length === 0) {
       // Se redirecciona a la pagina StepItinerary 
-      navigate('/extranet/activity/createItinerary');
+      navigateToActivityStep(navigate, '/extranet/activity/createItinerary', {
+        activityId,
+        lang,
+        currency: urlCurrency,
+        currentStep
+      });
       return;
     }
-    navigate('/extranet/activity/createItinerary');
+    navigateToActivityStep(navigate, '/extranet/activity/createItinerary', {
+      activityId,
+      lang,
+      currency: urlCurrency,
+      currentStep
+    });
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createImages');
+    navigateToActivityStep(navigate, '/extranet/activity/createImages', {
+      activityId,
+      lang,
+      currency: urlCurrency,
+      currentStep
+    });
   };
 
   return (
@@ -402,14 +428,11 @@ const StepOptions: React.FC = () => {
                             <div className="d-flex gap-2">
                               <button
                                 type="button"
-                                className={`btn btn-sm ${option.isActive ? 'btn-success' : 'btn-secondary'}`}
-                                onClick={() => handleToggleOption(option.id)}
-                                title={option.isActive ? 
-                                  getTranslation('stepOptions.actions.deactivate', language) : 
-                                  getTranslation('stepOptions.actions.activate', language)
-                                }
+                                className={`btn btn-sm btn-success`}
+                                onClick={() => handleEditOption(option.id)}
+                                title={getTranslation('stepOptions.actions.edit', language)}
                               >
-                                <i className={`fas fa-${option.isActive ? 'check' : 'times'}`}></i>
+                                <i className="fas fa-pencil"></i>
                               </button>
                               <button
                                 type="button"

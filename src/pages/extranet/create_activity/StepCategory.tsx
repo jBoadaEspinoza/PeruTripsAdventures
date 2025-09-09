@@ -4,17 +4,22 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
-import { useAppDispatch, useAppSelector } from '../../../redux/store';
-import { setActivityId, setSelectedCategory, setCurrentStep } from '../../../redux/activityCreationSlice';
+import { useAppDispatch } from '../../../redux/store';
+import { setSelectedCategory } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
 import { categoriesApi } from '../../../api/categories';
 import type { Category } from '../../../api/categories';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepCategory: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
+  
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -59,13 +64,16 @@ const StepCategory: React.FC = () => {
           const selectedCat = categories.find(cat => cat.id === selectedCategoryId);
           
           if (selectedCat) {
-            // Guardar en Redux
-            dispatch(setActivityId(newActivityId));
+            // Guardar solo la categoría seleccionada en Redux
             dispatch(setSelectedCategory({ id: selectedCat.id, name: selectedCat.name }));
-            dispatch(setCurrentStep(2));
             
-            // Navegar al siguiente paso
-            navigate('/extranet/activity/createTitle');
+            // Navegar al siguiente paso con parámetros de URL
+            navigateToActivityStep(navigate, '/extranet/activity/createTitle', {
+              activityId: newActivityId,
+              lang,
+              currency,
+              currentStep: 2
+            });
           }
         } else {
           setError(getTranslation('stepCategory.error.createFailed', language));

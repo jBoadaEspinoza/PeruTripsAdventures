@@ -5,9 +5,12 @@ import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { imagesApi } from '../../../api/images';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import { FirebaseService } from '../../../services/firebaseService';
+import { ActivityImage } from '../../../api/activities';
 
 interface ImageFile {
   file: File;
@@ -16,40 +19,70 @@ interface ImageFile {
   isUploading: boolean;
   uploadProgress: number;
   error?: string;
+  isExisting?: boolean; // Flag para identificar imágenes existentes
+  id?: number | null; // ID de la imagen en la base de datos (null para nuevas)
 }
 
 const StepImages: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
+  const hasRedirected = useRef(false);
   const dispatch = useAppDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [activityData, setActivityData] = useState<any>(null);
+  const [activityImages, setActivityImages] = useState<ActivityImage[]>([]);
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
 
-  // Set current step when component mounts
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(8)); // StepImages is step 8
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+        
+        // Cargar imágenes si existen
+        if (activityData && activityData.images) {
+          setActivityImages(activityData.images);
+          
+          // Convertir ActivityImage a ImageFile para mostrar en el componente
+          const existingImages: ImageFile[] = activityData.images.map((img: ActivityImage) => ({
+            file: new File([], ''), // Archivo vacío ya que es una imagen existente
+            preview: img.imageUrl,
+            url: img.imageUrl,
+            isUploading: false,
+            uploadProgress: 100,
+            isExisting: true, // Agregar flag para identificar imágenes existentes
+            id: img.id // Incluir el ID de la imagen existente
+          }));
+          
+          setImages(existingImages);
+        } else {
+          setActivityImages([]);
+          setImages([]);
+        }
 
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
+  
   useEffect(() => {
     // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepImages: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    } else if (activityId) {
+      hasRedirected.current = false;
     }
   }, [activityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepImages - ActivityId:', activityId);
-    console.log('StepImages - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
 
   const validateImage = (file: File): Promise<{ valid: boolean; error?: string }> => {
     return new Promise((resolve) => {
@@ -186,7 +219,38 @@ const StepImages: React.FC = () => {
     }
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = async (index: number) => {
+    const imageToRemove = images[index];
+    
+    if (imageToRemove.id && imageToRemove.id !== null) {
+      // Imagen existente con ID: eliminar de Firebase y base de datos
+      try {
+        await withLoading(async () => {
+          // 1. Eliminar de Firebase
+          if (imageToRemove.url) {
+            try {
+              await FirebaseService.deleteFile(imageToRemove.url);
+            } catch (firebaseError) {
+              console.error('Error deleting from Firebase:', firebaseError);
+              // Continuar aunque falle Firebase
+            }
+          }
+          
+          // 2. Eliminar de la base de datos
+          const response = await imagesApi.deleteImage(imageToRemove.id!);
+          if (!response.success) {
+            console.error('Error deleting from database:', response.message);
+            // Mostrar error pero continuar
+          }
+        }, 'delete-image');
+      } catch (error) {
+        console.error('Error removing image:', error);
+        setError(getTranslation('stepImages.error.deleteFailed', language));
+        return;
+      }
+    }
+    
+    // 3. Eliminar de la página (tanto para imágenes existentes como nuevas)
     setImages(prev => {
       const newImages = [...prev];
       const removedImage = newImages[index];
@@ -233,31 +297,34 @@ const StepImages: React.FC = () => {
     }
   };
 
-  const uploadImages = async (): Promise<string[]> => {
-    const uploadPromises = images.map(async (imageFile, index) => {
+  const uploadImages = async (imagesToUpload: ImageFile[] = images): Promise<string[]> => {
+    const uploadPromises = imagesToUpload.map(async (imageFile, index) => {
+      // Find the index in the main images array
+      const mainIndex = images.findIndex(img => img === imageFile);
+      
       // Update upload state
       setImages(prev => prev.map((img, i) => 
-        i === index ? { ...img, isUploading: true, uploadProgress: 0 } : img
+        i === mainIndex ? { ...img, isUploading: true, uploadProgress: 0 } : img
       ));
 
       try {
         const url = await uploadToFirebase(imageFile.file, (progress) => {
           // Update progress in real-time
           setImages(prev => prev.map((img, i) => 
-            i === index ? { ...img, uploadProgress: progress } : img
+            i === mainIndex ? { ...img, uploadProgress: progress } : img
           ));
         });
         
         // Update with uploaded URL
         setImages(prev => prev.map((img, i) => 
-          i === index ? { ...img, url, isUploading: false, uploadProgress: 100 } : img
+          i === mainIndex ? { ...img, url, isUploading: false, uploadProgress: 100 } : img
         ));
         
         return url;
       } catch (error) {
         // Update with error
         setImages(prev => prev.map((img, i) => 
-          i === index ? { ...img, isUploading: false, error: 'Upload failed' } : img
+          i === mainIndex ? { ...img, isUploading: false, error: 'Upload failed' } : img
         ));
         throw error;
       }
@@ -266,6 +333,87 @@ const StepImages: React.FC = () => {
     return Promise.all(uploadPromises);
   };
 
+
+  const handleSaveAndExit = async () => {
+    if (images.length < 3) {
+      setError(getTranslation('stepImages.error.minimumThreeRequired', language));
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      // 1. Evaluar qué imágenes están en la base de datos usando el ID
+      const imagesToUpload: ImageFile[] = [];
+      const existingImages: ActivityImage[] = [];
+
+      for (const image of images) {
+        if (image.id && image.id !== null) {
+          // Es una imagen existente con ID, NO subir a Firebase
+          existingImages.push({
+            id: image.id,
+            imageUrl: image.url || image.preview,
+            isCover: false // Se determinará después
+          });
+        } else {
+          // Es una imagen nueva (id=null), agregar para subir
+          imagesToUpload.push(image);
+        }
+      }
+
+      // 2. Subir imágenes faltantes a Firebase
+      let newImageUrls: string[] = [];
+      if (imagesToUpload.length > 0) {
+        const urls = await uploadImages(imagesToUpload);
+        newImageUrls = urls.filter(url => url);
+        
+        if (newImageUrls.length === 0) {
+          setError(getTranslation('stepImages.error.uploadFailed', language));
+          return;
+        }
+      }
+
+      // 3. Preparar todas las imágenes (existentes + nuevas)
+      const allImages = [
+        ...existingImages.map((img, index) => ({
+          url: img.imageUrl,
+          cover: index === 0 // Primera imagen existente es cover
+        })),
+        ...newImageUrls.map((url, index) => ({
+          url,
+          cover: existingImages.length === 0 && index === 0 // Primera imagen nueva es cover si no hay existentes
+        }))
+      ];
+
+      // 4. Enviar todas las imágenes a la base de datos
+      const response = await activitiesApi.createImages({
+        id: activityId!,
+        images: allImages
+      });
+
+      if (response.success) {
+        // Navigate to next step (StepOptions)
+        navigate('/extranet/dashboard');
+      } else {
+        setError(response.message || getTranslation('stepImages.error.saveFailed', language));
+      }
+    } catch (error) {
+      // Determinar el tipo de error para mostrar mensaje apropiado
+      let errorMessage = getTranslation('stepImages.error.saveFailed', language);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Firebase')) {
+          errorMessage = getTranslation('stepImages.error.firebaseUpload', language);
+        } else if (error.message.includes('network')) {
+          errorMessage = getTranslation('stepImages.error.network', language);
+        }
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsUploading(false);
+    }
+  }
   const handleContinue = async () => {
     if (images.length < 3) {
       setError(getTranslation('stepImages.error.minimumThreeRequired', language));
@@ -275,54 +423,92 @@ const StepImages: React.FC = () => {
     setIsUploading(true);
     
     try {
-      // Upload all images to Firebase
-      const urls = await uploadImages();
-      
-      // Filter out any failed uploads
-      const validUrls = urls.filter(url => url);
-      
-      if (validUrls.length === 0) {
-        setError(getTranslation('stepImages.error.uploadFailed', language));
-        return;
+      // 1. Evaluar qué imágenes están en la base de datos usando el ID
+      const imagesToUpload: ImageFile[] = [];
+      const existingImages: ActivityImage[] = [];
+
+      for (const image of images) {
+        if (image.id && image.id !== null) {
+          // Es una imagen existente con ID, NO subir a Firebase
+          existingImages.push({
+            id: image.id,
+            imageUrl: image.url || image.preview,
+            isCover: false // Se determinará después
+          });
+        } else {
+          // Es una imagen nueva (id=null), agregar para subir
+          imagesToUpload.push(image);
+        }
       }
 
-      // Call createImages API
+      // 2. Subir imágenes faltantes a Firebase
+      let newImageUrls: string[] = [];
+      if (imagesToUpload.length > 0) {
+        const urls = await uploadImages(imagesToUpload);
+        newImageUrls = urls.filter(url => url);
+        
+        if (newImageUrls.length === 0) {
+          setError(getTranslation('stepImages.error.uploadFailed', language));
+          return;
+        }
+      }
+
+      // 3. Preparar todas las imágenes (existentes + nuevas)
+      const allImages = [
+        ...existingImages.map((img, index) => ({
+          url: img.imageUrl,
+          cover: index === 0 // Primera imagen existente es cover
+        })),
+        ...newImageUrls.map((url, index) => ({
+          url,
+          cover: existingImages.length === 0 && index === 0 // Primera imagen nueva es cover si no hay existentes
+        }))
+      ];
+
+      // 4. Enviar todas las imágenes a la base de datos
       const response = await activitiesApi.createImages({
         id: activityId!,
-        images: validUrls.map((url, index) => ({
-          url,
-          cover: index === 0 // First image is cover
-        }))
+        images: allImages
       });
 
       if (response.success) {
         // Navigate to next step (StepOptions)
-        navigate('/extranet/activity/createOptions');
+        navigateToActivityStep(navigate, '/extranet/activity/createOptions', {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
       } else {
         setError(response.message || getTranslation('stepImages.error.saveFailed', language));
       }
-          } catch (error) {
-        console.error('Error saving images:', error);
-        
-        // Determinar el tipo de error para mostrar mensaje apropiado
-        let errorMessage = getTranslation('stepImages.error.saveFailed', language);
-        
-        if (error instanceof Error) {
-          if (error.message.includes('Firebase')) {
-            errorMessage = getTranslation('stepImages.error.firebaseUpload', language);
-          } else if (error.message.includes('network')) {
-            errorMessage = getTranslation('stepImages.error.network', language);
-          }
+    } catch (error) {
+      console.error('Error saving images:', error);
+      
+      // Determinar el tipo de error para mostrar mensaje apropiado
+      let errorMessage = getTranslation('stepImages.error.saveFailed', language);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Firebase')) {
+          errorMessage = getTranslation('stepImages.error.firebaseUpload', language);
+        } else if (error.message.includes('network')) {
+          errorMessage = getTranslation('stepImages.error.network', language);
         }
-        
-        setError(errorMessage);
-      } finally {
-        setIsUploading(false);
       }
+      
+      setError(errorMessage);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createNotIncluded');
+    navigateToActivityStep(navigate, '/extranet/activity/createNotIncluded', {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   return (
@@ -437,7 +623,7 @@ const StepImages: React.FC = () => {
                 </div>
               </div>
               
-                             <input
+              <input
                  ref={fileInputRef}
                  type="file"
                  multiple
@@ -564,7 +750,7 @@ const StepImages: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
                 disabled={isUploading}
               >
                 {getTranslation('stepImages.saveAndExit', language)}

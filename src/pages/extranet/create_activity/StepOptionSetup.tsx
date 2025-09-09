@@ -9,6 +9,8 @@ import { useExtranetAuth } from '../../../hooks/useExtranetAuth';
 import { resetActivityCreation } from '../../../redux/activityCreationSlice';
 import { bookingOptionApi } from '../../../api/bookingOption';
 import type { CreateBookingOptionSetupRequest } from '../../../api/bookingOption';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 interface OptionSetupData {
   optionTitle: string;
@@ -20,6 +22,8 @@ interface OptionSetupData {
   skipLineType: string;
   wheelchairAccessible: boolean;
   durationType: 'duration' | 'validity';
+  isOpenDuration: boolean; // Nuevo: controla si es duración fija o validez
+  validityDays: number;
   durationDays: number;
   durationHours: number;
   durationMinutes: number;
@@ -31,26 +35,30 @@ export default function StepOptionSetup() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
-  const { activityId, selectedCategory, currentStep } = useAppSelector(state => state.activityCreation);
   const { isAuthenticated, isInitialized, isValidating } = useExtranetAuth();
+  
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
   
   const [formData, setFormData] = useState<OptionSetupData>({
     optionTitle: '',
     maxGroupSize: -1, // -1 representa "Sin Límite"
-    languages: [
-      { name: 'Español', code: 'es' },
-      { name: 'Inglés', code: 'en' }
-    ],
+    languages: [],
     guideMaterials: false,
     isPrivate: false,
     skipLines: false,
     skipLineType: '',
     wheelchairAccessible: false,
     durationType: 'duration',
+    isOpenDuration: false, // Por defecto: duración fija
+    validityDays: 1,
     durationDays: 0,
     durationHours: 0,
     durationMinutes: 0
   });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   const [searchLanguage, setSearchLanguage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,31 +75,88 @@ export default function StepOptionSetup() {
     { name: 'Árabe', code: 'ar' }
   ]);
 
-  // Obtener el optionId de la URL
   const optionId = searchParams.get('optionId');
 
   // Clave para localStorage
   const storageKey = `optionSetup_${optionId || 'default'}`;
 
-  // Cargar datos guardados al inicializar
+  // Cargar datos de la opción de reserva existente si hay optionId
   useEffect(() => {
+    const loadBookingOption = async () => {
+      if (!optionId || !activityId || !lang || !currency) return;
+      
+      setIsLoading(true);
+      try {
+        console.log('StepOptionSetup: Cargando opción de reserva existente...', { optionId, activityId, lang, currency });
+        const response = await bookingOptionApi.searchBookingOptionById(activityId, optionId, lang, currency);
+        
+        if (response.success && response.data) {
+          // Mapear los datos de la API al formato del formulario
+          const optionData = response.data;
+          
+          // Convertir languages de string[] a { name: string; code: string }[]
+          const mappedLanguages = optionData.languages?.map(lang => {
+            const languageMap: { [key: string]: { name: string; code: string } } = {
+              'es': { name: 'Español', code: 'es' },
+              'en': { name: 'Inglés', code: 'en' },
+              'fr': { name: 'Francés', code: 'fr' },
+              'de': { name: 'Alemán', code: 'de' },
+              'it': { name: 'Italiano', code: 'it' },
+              'pt': { name: 'Portugués', code: 'pt' },
+              'zh': { name: 'Chino', code: 'zh' },
+              'ja': { name: 'Japonés', code: 'ja' },
+              'ar': { name: 'Árabe', code: 'ar' }
+            };
+            return languageMap[lang] || { name: lang, code: lang };
+          }) || [{ name: 'Español', code: 'es' }, { name: 'Inglés', code: 'en' }];
+          setFormData({
+            optionTitle: optionData.title || '',
+            maxGroupSize: optionData.groupMaxSize || -1,
+            languages: mappedLanguages,
+            guideMaterials: false, // No disponible en BookingOption
+            isPrivate: optionData.isPrivate || false,
+            skipLines: false, // No disponible en BookingOption
+            skipLineType: '', // No disponible en BookingOption
+            wheelchairAccessible: false, // No disponible en BookingOption
+            durationType: optionData.isOpenDuration ? 'validity' : 'duration',
+            isOpenDuration: optionData.isOpenDuration || false,
+            durationDays: optionData.durationDays || 0,
+            durationHours: optionData.durationHours || 0,
+            durationMinutes: optionData.durationMinutes || 0,
+            validityDays: optionData.isOpenDuration ? (optionData.durationDays || 1) : 1
+          });
+        } else {
+          console.log('StepOptionSetup: No se encontraron datos de opción de reserva, usando valores por defecto');
+        }
+      } catch (error) {
+        console.error('StepOptionSetup: Error al cargar opción de reserva:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBookingOption();
+  }, [optionId, activityId, lang, currency]);
+
+  // Cargar datos guardados al inicializar (solo si no hay optionId)
+  useEffect(() => {
+    if (optionId) return; // Si hay optionId, no cargar desde localStorage
+    
     const savedData = localStorage.getItem(storageKey);
     if (savedData) {
       try {
         const parsedData = JSON.parse(savedData);
         setFormData(prev => ({ ...prev, ...parsedData }));
-        console.log('StepOptionSetup: Datos cargados desde localStorage:', parsedData);
       } catch (error) {
         console.error('StepOptionSetup: Error al cargar datos desde localStorage:', error);
       }
     }
-  }, [storageKey]);
+  }, [storageKey, optionId]);
 
   // Guardar datos en localStorage cuando cambien
   useEffect(() => {
     if (Object.keys(formData).length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(formData));
-      console.log('StepOptionSetup: Datos guardados en localStorage:', formData);
     }
   }, [formData, storageKey]);
 
@@ -103,30 +168,16 @@ export default function StepOptionSetup() {
     // Solo validar autenticación, no redirigir por falta de datos
     if (isInitialized && !isValidating) {
       if (!isAuthenticated) {
-        console.log('StepOptionSetup: Usuario no autenticado, redirigiendo a login');
         navigate('/extranet/login');
         return;
       }
-      
-      // Si está autenticado, solo mostrar logs informativos
-      if (!activityId) {
-        console.log('StepOptionSetup: No se encontró activityId en Redux, pero continuando...');
-        // No redirigir, solo mostrar mensaje informativo
-      }
-      
-      if (!optionId) {
-        console.log('StepOptionSetup: No se encontró optionId en la URL, pero continuando...');
-        // No redirigir, solo mostrar mensaje informativo
-      }
-      
-      console.log('StepOptionSetup: Cargando con activityId:', activityId, 'y optionId:', optionId);
     }
   }, [isAuthenticated, isInitialized, isValidating, activityId, optionId, navigate]);
 
   useEffect(() => {
     // Ajustar los valores de duración cuando cambien las unidades
-    if (formData.durationType === 'duration') {
-      // Validar días (0-30)
+    if (!formData.isOpenDuration) {
+      // Duración fija (0-30 días, 0-23 horas, 0-59 minutos)
       if (formData.durationDays > 30) {
         setFormData(prev => ({ ...prev, durationDays: 30 }));
       }
@@ -154,13 +205,13 @@ export default function StepOptionSetup() {
       if (formData.durationDays > 0 && formData.durationHours >= 24) {
         setFormData(prev => ({ ...prev, durationHours: 23 }));
       }
-    } else if (formData.durationType === 'validity') {
-      // Validar días de validez (1-365)
-      if (formData.durationDays > 365) {
-        setFormData(prev => ({ ...prev, durationDays: 365 }));
+    } else {
+      // Validez (1-365 días)
+      if (formData.validityDays > 365) {
+        setFormData(prev => ({ ...prev, validityDays: 365 }));
       }
-      if (formData.durationDays < 1) {
-        setFormData(prev => ({ ...prev, durationDays: 1 }));
+      if (formData.validityDays < 1) {
+        setFormData(prev => ({ ...prev, validityDays: 1 }));
       }
       
       // Resetear horas y minutos para validez
@@ -168,23 +219,20 @@ export default function StepOptionSetup() {
         setFormData(prev => ({ ...prev, durationHours: 0, durationMinutes: 0 }));
       }
     }
-  }, [formData.durationDays, formData.durationHours, formData.durationMinutes, formData.durationType]);
+  }, [formData.durationDays, formData.durationHours, formData.durationMinutes, formData.validityDays, formData.isOpenDuration]);
 
   useEffect(() => {
-    if (!activityId) {
-      console.log('StepOptionSetup: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
-      return;
-    }
-
     if (!optionId) {
-      console.log('StepOptionSetup: No se encontró optionId en la URL, redirigiendo a createOptions');
-      navigate('/extranet/activity/createOptions');
+      navigateToActivityStep(navigate, '/extranet/activity/createOptions', {
+        activityId,
+        lang,
+        currency,
+        currentStep: 9
+      });
       return;
     }
+  }, [activityId, optionId, navigate, lang, currency]);
 
-    console.log('StepOptionSetup: Cargando con activityId:', activityId, 'y optionId:', optionId);
-  }, [activityId, optionId, navigate]);
 
   const handleLanguageToggle = (languageName: string) => {
     setFormData(prev => ({
@@ -195,10 +243,6 @@ export default function StepOptionSetup() {
     }));
   };
 
-  const handleLanguageSearch = (searchTerm: string) => {
-    setSearchLanguage(searchTerm);
-  };
-
   const handleLanguageSelect = (selectedLanguage: string) => {
     const languageObj = availableLanguages.find(lang => lang.name === selectedLanguage);
     if (languageObj && !formData.languages.some(lang => lang.name === languageObj.name)) {
@@ -207,9 +251,6 @@ export default function StepOptionSetup() {
     }
   };
 
-  const filteredLanguages = availableLanguages.filter(lang =>
-    lang.name.toLowerCase().includes(searchLanguage.toLowerCase())
-  );
 
   const handleContinue = async () => {
     if (isSubmitting) return; // Prevenir múltiples envíos
@@ -224,33 +265,29 @@ export default function StepOptionSetup() {
         maxGroupSize: formData.maxGroupSize === -1 ? null : formData.maxGroupSize,
         guideLanguages: formData.languages.map(lang => lang.code),
         isPrivate: formData.isPrivate,
-        isOpenDuration: formData.durationType === 'validity',
-        durationDays: formData.durationType === 'duration' ? formData.durationDays : null,
-        durationHours: formData.durationType === 'duration' ? formData.durationHours : null,
-        durationMinutes: formData.durationType === 'duration' ? formData.durationMinutes : null,
-        validityDays: formData.durationType === 'validity' ? formData.durationDays : null
+        isOpenDuration: formData.isOpenDuration,
+        durationDays: !formData.isOpenDuration ? formData.durationDays : null,
+        durationHours: !formData.isOpenDuration ? formData.durationHours : null,
+        durationMinutes: !formData.isOpenDuration ? formData.durationMinutes : null,
+        validityDays: formData.isOpenDuration ? formData.validityDays : null
       };
-
-      console.log('StepOptionSetup: Enviando request a createSetup:', request);
 
       // Llamar a la API
       const response = await bookingOptionApi.createSetup(request);
 
-      if (response.success) {
-        console.log('StepOptionSetup: Setup creado exitosamente con ID:', response.idCreated);
-        
-        // No limpiar localStorage aún, faltan varios pasos por completar
-        console.log('StepOptionSetup: Datos mantenidos en localStorage para siguientes pasos');
-        
+      if (response.success) {       
         // Navegar al siguiente paso
-        navigate(`/extranet/activity/createOptionMeetingPickup?optionId=${response.idCreated}`);
+        navigateToActivityStep(navigate, `/extranet/activity/createOptionMeetingPickup?optionId=${response.idCreated}`, {
+          activityId,
+          lang,
+          currency,
+          currentStep: 9
+        });
       } else {
-        console.error('StepOptionSetup: Error al crear setup:', response.message);
         // Aquí podrías mostrar un mensaje de error al usuario
         alert(`Error al guardar la configuración: ${response.message}`);
       }
     } catch (error) {
-      console.error('StepOptionSetup: Error inesperado:', error);
       alert('Error inesperado al guardar la configuración');
     } finally {
       setIsSubmitting(false);
@@ -259,19 +296,12 @@ export default function StepOptionSetup() {
 
   const handleBack = () => {
     // No limpiar el estado de Redux aquí, mantenerlo para regresar
-    navigate('/extranet/activity/createOptions');
-  };
-
-  // Función para limpiar todo el estado cuando sea necesario
-  const handleResetAll = () => {
-    // Limpiar localStorage
-    localStorage.removeItem(storageKey);
-    
-    // Limpiar estado de Redux
-    dispatch(resetActivityCreation());
-    
-    console.log('StepOptionSetup: Estado completo limpiado');
-    navigate('/extranet/activity/createCategory');
+    navigateToActivityStep(navigate, '/extranet/activity/createOptions', {
+      activityId,
+      lang,
+      currency,
+      currentStep: 9
+    });
   };
 
   // Si no hay optionId, mostrar mensaje de carga o redirigir
@@ -294,41 +324,18 @@ export default function StepOptionSetup() {
     );
   }
 
-  // Si no hay activityId, mostrar mensaje informativo
-  if (!activityId) {
+  // Si está cargando los datos de la opción de reserva
+  if (isLoading) {
     return (
       <OptionSetupLayout currentSection="optionSettings">
         <div className="container-fluid">
           <div className="row">
             <div className="col-12">
               <div className="text-center py-5">
-                <div className="alert alert-warning">
-                  <i className="fas fa-exclamation-triangle me-2"></i>
-                  <h6 className="alert-heading">Actividad no encontrada</h6>
-                  <p className="mb-0">
-                    {language === 'es' 
-                      ? 'No se encontró información de la actividad. Por favor, regresa al paso anterior para continuar.'
-                      : 'Activity information not found. Please go back to the previous step to continue.'
-                    }
-                  </p>
-                  <hr />
-                  <div className="d-flex gap-2 justify-content-center">
-                    <button 
-                      className="btn btn-outline-warning btn-sm"
-                      onClick={() => navigate('/extranet/activity/createCategory')}
-                    >
-                      <i className="fas fa-arrow-left me-2"></i>
-                      {language === 'es' ? 'Ir a Categoría' : 'Go to Category'}
-                    </button>
-                    <button 
-                      className="btn btn-outline-danger btn-sm"
-                      onClick={handleResetAll}
-                    >
-                      <i className="fas fa-redo me-2"></i>
-                      {language === 'es' ? 'Reiniciar Todo' : 'Reset All'}
-                    </button>
-                  </div>
+                <div className="spinner-border text-primary mb-3" role="status">
+                  <span className="visually-hidden">Cargando opción de reserva...</span>
                 </div>
+                <p className="text-muted">Cargando configuración de opción de reserva...</p>
               </div>
             </div>
           </div>
@@ -336,7 +343,6 @@ export default function StepOptionSetup() {
       </OptionSetupLayout>
     );
   }
-
   return (
     <OptionSetupLayout currentSection="optionSettings">
       <div className="container-fluid">
@@ -349,19 +355,7 @@ export default function StepOptionSetup() {
                 <div className="mb-5">
                   <h6 className="fw-bold mb-3 text-primary">
                     {getTranslation('stepOptions.createForm.titleLabel', language)}
-                  </h6>
-                  
-                  {/* Mensaje de persistencia de datos */}
-                  <div className="alert alert-info mb-3">
-                    <i className="fas fa-info-circle me-2"></i>
-                    <small>
-                      {language === 'es' 
-                        ? 'Tu progreso se guarda automáticamente. Puedes recargar la página sin perder la información ingresada. El estado de la actividad también se mantiene.'
-                        : 'Your progress is automatically saved. You can reload the page without losing the entered information. The activity state is also maintained.'
-                      }
-                    </small>
-                  </div>
-                  
+                  </h6>    
                   <p className="text-muted mb-3">
                     {language === 'es' 
                       ? 'Si ofreces varias opciones, escribe un título breve que explique claramente al cliente en qué se diferencia esta opción de las demás.'
@@ -533,15 +527,15 @@ export default function StepOptionSetup() {
                       type="radio"
                       name="durationType"
                       id="durationType"
-                      checked={formData.durationType === 'duration'}
-                      onChange={() => setFormData({...formData, durationType: 'duration'})}
+                      checked={!formData.isOpenDuration}
+                      onChange={() => setFormData({...formData, isOpenDuration: false, durationType: 'duration'})}
                     />
                     <label className="form-check-label" htmlFor="durationType">
                       {getTranslation('stepOptionSetup.duration.type.duration', language)}
                     </label>
                   </div>
                   
-                  {formData.durationType === 'duration' && (
+                  {!formData.isOpenDuration && (
                     <div className="ms-4 mb-3">
                       <div className="row g-3" style={{ width: '400px' }}>
                         {/* Días */}
@@ -614,28 +608,15 @@ export default function StepOptionSetup() {
                       type="radio"
                       name="durationType"
                       id="validityType"
-                      checked={formData.durationType === 'validity'}
-                      onChange={() => setFormData({...formData, durationType: 'validity'})}
+                      checked={formData.isOpenDuration}
+                      onChange={() => setFormData({...formData, isOpenDuration: true, durationType: 'validity'})}
                     />
                     <label className="form-check-label" htmlFor="validityType">
                       {getTranslation('stepOptionSetup.duration.type.validity', language)}
                     </label>
                   </div>
-                  
-                  {/* Explicación de validez */}
-                  {formData.durationType === 'validity' && (
-                    <div className="ms-4 mb-3">
-                      <div className="alert alert-info">
-                        <small>
-                          <i className="fas fa-info-circle me-2"></i>
-                          <strong>Ejemplo:</strong> Tickets de entrada para museos que pueden utilizarse en cualquier momento durante el horario de apertura.
-                        </small>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Campo para días de validez */}
-                  {formData.durationType === 'validity' && (
+                  {formData.isOpenDuration && (
                     <div className="ms-4 mb-3">
                       <div className="row g-3" style={{ width: '300px' }}>
                         <div className="col-md-6">
@@ -643,23 +624,23 @@ export default function StepOptionSetup() {
                           <input
                             type="number"
                             className="form-control"
-                            value={formData.durationDays}
-                            onChange={(e) => setFormData({...formData, durationDays: parseInt(e.target.value) || 0})}
+                            value={formData.validityDays}
+                            onChange={(e) => setFormData({...formData, validityDays: parseInt(e.target.value) || 0})}
                             min="1"
                             max="365"
                             style={{ width: '100%' }}
                           />
-                  </div>
-                </div>
-
+                        </div>
+                      </div>
+                      
                       {/* Resumen de validez */}
                       <div className="mt-3 p-2 bg-light rounded">
-                  <small className="text-muted">
+                        <small className="text-muted">
                           <strong>Período de validez:</strong> {
-                            formData.durationDays === 1 
+                            formData.validityDays === 1 
                               ? '1 día' 
-                              : formData.durationDays > 0 
-                                ? `${formData.durationDays} días`
+                              : formData.validityDays > 0 
+                                ? `${formData.validityDays} días`
                                 : 'No configurado'
                           }
                         </small>
@@ -667,7 +648,7 @@ export default function StepOptionSetup() {
                       
                       <small className="text-muted mt-2 d-block">
                         Los clientes podrán usar su ticket en cualquier momento durante este período de validez.
-                  </small>
+                      </small>
                     </div>
                   )}
                 </div>

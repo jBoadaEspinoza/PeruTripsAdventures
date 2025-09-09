@@ -341,6 +341,10 @@ export const translations: Translations = {
     es: 'Ver detalles',
     en: 'View details'
   },
+  'activities.finishProcess': {
+    es: 'Terminar proceso',
+    en: 'Finish process'
+  },
   'activities.edit': {
     es: 'Editar',
     en: 'Edit'
@@ -1108,6 +1112,10 @@ export const translations: Translations = {
     es: 'Error al guardar. Por favor, inténtelo de nuevo.',
     en: 'Error saving. Please try again.'
   },
+  'stepNotInclude.error.emptyExclusionsNotAllowed': {
+    es: 'No se permiten exclusiones vacías. Completa o elimina las exclusiones vacías antes de continuar.',
+    en: 'Empty exclusions are not allowed. Complete or remove empty exclusions before continuing.'
+  },
   'stepNotInclude.removeExclusion': {
     es: 'Eliminar exclusión',
     en: 'Remove exclusion'
@@ -1163,8 +1171,8 @@ export const translations: Translations = {
     en: 'Tips'
   },
   'stepImages.examples.description': {
-    es: 'Elige fotos coloridas, brillantes y centradas que cuenten una historia. Necesitas al menos 4 imágenes, pero trata de añadir de 7 a 10. Coloca las mejores al principio.',
-    en: 'Choose colorful, bright and centered photos that tell a story. You need at least 4 images, but try to add 7 to 10. Place the best ones first.'
+    es: 'Elige fotos coloridas, brillantes y centradas que cuenten una historia. Necesitas al menos 3 imágenes, pero trata de añadir de 7 a 10. Coloca las mejores al principio.',
+    en: 'Choose colorful, bright and centered photos that tell a story. You need at least 3 images, but try to add 7 to 10. Place the best ones first.'
   },
   'stepImages.upload.instructions': {
     es: 'Arrastra tus fotos a la zona de abajo o selecciona "Subir fotos". Para cambiar el orden de las imágenes, selecciona la imagen que quieras reordenar y utiliza las flechas.',
@@ -1309,6 +1317,7 @@ export const translations: Translations = {
   'stepOptions.actions.activate': { es: 'Activar opción', en: 'Activate option' },
   'stepOptions.actions.deactivate': { es: 'Desactivar opción', en: 'Deactivate option' },
   'stepOptions.actions.delete': { es: 'Eliminar opción', en: 'Delete option' },
+  'stepOptions.actions.edit': { es: 'Editar opción', en: 'Edit option' },
   'stepOptions.warning.activeOption': { es: 'No se puede crear una nueva opción mientras hay una opción activa. Desactiva la opción actual para crear una nueva.', en: 'Cannot create a new option while there is an active option. Deactivate the current option to create a new one.' },
   'stepOptions.button.disabledTitle': { es: 'No se puede crear una nueva opción mientras hay una opción activa', en: 'Cannot create a new option while there is an active option' },
   'stepOptions.button.enabledTitle': { es: 'Crear nueva opción de reserva', en: 'Create new booking option' },
@@ -1492,6 +1501,7 @@ export const translations: Translations = {
 
   // Step Option Meeting Pickup
   'stepMeetingPickup.title': { es: 'Encuentro o recogida', en: 'Meeting or pickup' },
+  'stepMeetingPickup.howToArrive': { es: '¿Cómo llegan los clientes a la actividad?', en: 'How do clients arrive at the activity?' },
   'stepMeetingPickup.description': { es: 'Configura cómo los clientes llegarán a tu actividad', en: 'Configure how clients will arrive at your activity' },
   'stepMeetingPickup.arrivalMethod.title': { es: 'Método de llegada', en: 'Arrival method' },
   'stepMeetingPickup.arrivalMethod.description': { es: 'Describe el punto de encuentro (opcional)', en: 'Describe the meeting point (optional)' },

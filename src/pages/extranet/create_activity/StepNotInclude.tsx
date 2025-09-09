@@ -1,53 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepNotInclude: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
-  const [exclusions, setExclusions] = useState<string[]>(['']); // Initialize with 1 empty field
+  const hasRedirected = useRef(false);
+  const [activityData, setActivityData] = useState<any>(null);
+  const [exclusions, setExclusions] = useState<string[]>([]); // Initialize empty - this step is optional
+  
+  // Debug: Log exclusions state
+  useEffect(() => {
+    console.log('StepNotInclude - exclusions state:', exclusions);
+  }, [exclusions]);
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
-
-  // Set current step when component mounts
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(7)); // StepNotInclude is step 7
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+        
+        // Cargar exclusions si existen (solo si hay datos reales)
+        if (activityData && activityData.notIncludes) {
+          if (Array.isArray(activityData.notIncludes) && activityData.notIncludes.length > 0) {
+            // Solo cargar si hay datos reales, no inicializar con campos vacíos
+            const loadedExclusions = activityData.notIncludes.filter(item => item && item.trim().length > 0);
+            console.log('StepNotInclude - loaded exclusions:', loadedExclusions);
+            setExclusions(loadedExclusions);
+          } else {
+            // Asegurar que esté vacío si no hay datos
+            console.log('StepNotInclude - no exclusions found, setting empty array');
+            setExclusions([]);
+          }
+        } else {
+          // Asegurar que esté vacío si no hay activityData
+          console.log('StepNotInclude - no activityData, setting empty array');
+          setExclusions([]);
+        }
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
 
   useEffect(() => {
-    // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepNotInclude: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    // Solo redirigir si no hay activityId y no se ha redirigido antes
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    } else if (activityId) {
+      hasRedirected.current = false;
     }
   }, [activityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepNotInclude - ActivityId:', activityId);
-    console.log('StepNotInclude - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
 
   const addExclusion = () => {
     setExclusions([...exclusions, '']);
   };
 
   const removeExclusion = (index: number) => {
-    // Only allow removal if we have more than 1 exclusion
-    if (exclusions.length > 1) {
-      const newExclusions = exclusions.filter((_, i) => i !== index);
+    const newExclusions = exclusions.filter((_, i) => i !== index);
       setExclusions(newExclusions);
-    }
   };
 
   const updateExclusion = (index: number, value: string) => {
@@ -56,14 +81,39 @@ const StepNotInclude: React.FC = () => {
     setExclusions(newExclusions);
   };
 
+
+  const handleSaveAndExit = async () => {
+    const validExclusions = exclusions.filter(exc => exc.trim().length > 0);
+    if (validExclusions.length === 0) {
+      setError(getTranslation('stepNotInclude.error.emptyExclusionsNotAllowed', language));
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        // Call createNotIncludes API
+        const response = await activitiesApi.createNotIncludes({
+          id: activityId!,
+          notInclusions: validExclusions,
+          lang: language
+        });
+        if (response.success) {
+          navigate('/extranet/dashboard');
+        } else {
+          setError(response.message || getTranslation('stepNotInclude.error.saveFailed', language));
+        }
+      } catch (error) {
+        setError(getTranslation('stepNotInclude.error.saveFailed', language));
+      }
+    }, 'save-loading');
+  };
+
   const handleContinue = async () => {
     const validExclusions = exclusions.filter(exc => exc.trim().length > 0);
     
-    // Since this step is optional, we can continue even with no exclusions
-    // But if the user has added some, they should be valid
-    if (validExclusions.length === 0) {
-      // No exclusions added, continue to next step
-      navigate('/extranet/activity/createImages');
+    // Check if there are any exclusions with empty content
+    if (exclusions.length > 0 && exclusions.some(exc => exc.trim().length === 0)) {
+      setError(getTranslation('stepNotInclude.error.emptyExclusionsNotAllowed', language));
       return;
     }
 
@@ -76,21 +126,40 @@ const StepNotInclude: React.FC = () => {
           lang: language
         });
 
+        // If there are no exclusions, continue to next step (StepImages)
+        if (validExclusions.length === 0) {
+          navigateToActivityStep(navigate, '/extranet/activity/createImages', {
+            activityId,
+            lang,
+            currency,
+            currentStep:8
+          });
+        }
+        
         if (response.success) {
           // Navigate to next step (StepImages)
-          navigate('/extranet/activity/createImages');
+          navigateToActivityStep(navigate, '/extranet/activity/createImages', {
+            activityId,
+            lang,
+            currency,
+            currentStep:8
+          });
         } else {
           setError(response.message || getTranslation('stepNotInclude.error.saveFailed', language));
         }
       } catch (error) {
-        console.error('Error saving exclusions:', error);
         setError(getTranslation('stepNotInclude.error.saveFailed', language));
       }
     }, 'save-loading');
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createInclude');
+    navigateToActivityStep(navigate, '/extranet/activity/createInclude', {
+      activityId,
+      lang,
+      currency,
+      currentStep:6
+    });
   };
 
   return (
@@ -133,7 +202,7 @@ const StepNotInclude: React.FC = () => {
                         placeholder={getTranslation('stepNotInclude.exclusions.placeholder', language)}
                         maxLength={100}
                       />
-                      {exclusions.length > 1 && (
+                      {exclusions.length > 0 && (
                         <button
                           type="button"
                           className="btn btn-outline-danger btn-sm"
@@ -185,7 +254,7 @@ const StepNotInclude: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
               >
                 {getTranslation('stepNotInclude.saveAndExit', language)}
               </button>

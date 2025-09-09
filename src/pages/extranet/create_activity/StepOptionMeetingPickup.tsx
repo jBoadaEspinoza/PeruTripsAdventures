@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import OptionSetupLayout from '../../../components/OptionSetupLayout';
-import { useAppSelector } from '../../../redux/store';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import GoogleMapsModal from '../../../components/GoogleMapsModal';
 import { placesApi, Place } from '../../../api/places';
 import { transportModesApi, TransportMode } from '../../../api/transportModes';
@@ -32,7 +33,8 @@ export default function StepOptionMeetingPickup() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { activityId } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
   
   const [formData, setFormData] = useState<MeetingPickupData>({
     arrivalMethod: 'meetingPoint',
@@ -75,9 +77,67 @@ export default function StepOptionMeetingPickup() {
   const [availableTransportModes, setAvailableTransportModes] = useState<TransportMode[]>([]);
   const [isLoadingTransportModes, setIsLoadingTransportModes] = useState(true);
   const [transportModesError, setTransportModesError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const hasRedirected = useRef(false);
 
   const optionId = searchParams.get('optionId');
   const storageKey = `meetingPickup_${optionId || 'default'}`;
+
+  // Cargar datos de la opción de reserva existente si hay optionId
+  useEffect(() => {
+    const loadBookingOption = async () => {
+      if (!optionId || !activityId || !lang || !currency) return;
+      
+      setIsLoading(true);
+      try {
+        const response = await bookingOptionApi.searchBookingOptionById(activityId, optionId, lang, currency);
+        
+        if (response.success && response.data) {
+          // Mapear los datos de la API al formato del formulario
+          const optionData = response.data;
+          
+          setFormData({
+            arrivalMethod: optionData.meetingType === 'MEETING_POINT' ? 'meetingPoint' : 'pickupService',
+            pickupType: optionData.pickupPoints && optionData.pickupPoints.length > 0 ? 'specificPlaces' : 'zones',
+            pickupAddresses: optionData.pickupPoints?.map(point => point.address) || [],
+            pickupAddressNotes: optionData.pickupPoints?.map(point => point.name) || [],
+            pickupDescription: '', // No disponible en BookingOption
+            pickupTimeCommunication: optionData.pickupNotificationWhen === 'ACTIVITY_START' ? 'activityStart' : 
+                                   optionData.pickupNotificationWhen === 'DAY_BEFORE' ? 'dayBefore' : 'within24h',
+            pickupTiming: optionData.pickupTimeOption || '0-30',
+            returnLocation: optionData.dropoffType === 'SAME_PICKUP' ? 'samePickup' : 
+                          optionData.dropoffType === 'OTHER_LOCATION' ? 'otherLocation' : 'noReturn',
+            returnAddresses: [], // No disponible en BookingOption
+            transportMode: optionData.transportModeId?.toString() || 'car',
+            originCity: optionData.pickupPoints && optionData.pickupPoints.length > 0 
+              ? optionData.pickupPoints[0].city.cityName.toLowerCase() 
+              : (optionData.meetingPointCity?.toLowerCase() || 'lima'),
+            meetingPointAddress: optionData.meetingPointAddress || '',
+            meetingPointLatitude: optionData.meetingPointLatitude || 0,
+            meetingPointLongitude: optionData.meetingPointLongitude || 0,
+            customPickupTiming: '', // No disponible en BookingOption
+            meetingPointDescription: optionData.meetingPointDescription || ''
+          });
+        }
+      } catch (error) {
+        console.error('StepOptionMeetingPickup: Error al cargar opción de reserva:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBookingOption();
+  }, [optionId, activityId, lang, currency]);
+
+  // Redireccionar a extranet/login si no hay activityId
+  useEffect(() => {
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    }else{
+      hasRedirected.current = false;
+    }
+  }, [activityId, navigate]);
 
   // Función para obtener las coordenadas de la ciudad seleccionada
   const getCityCoordinates = () => {
@@ -95,7 +155,6 @@ export default function StepOptionMeetingPickup() {
       try {
         const parsedData = JSON.parse(savedData);
         setFormData(prev => ({ ...prev, ...parsedData }));
-        console.log('StepOptionMeetingPickup: Datos cargados desde localStorage:', parsedData);
       } catch (error) {
         console.error('StepOptionMeetingPickup: Error al cargar datos desde localStorage:', error);
       }
@@ -106,7 +165,6 @@ export default function StepOptionMeetingPickup() {
   useEffect(() => {
     if (Object.keys(formData).length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(formData));
-      console.log('StepOptionMeetingPickup: Datos guardados en localStorage:', formData);
     }
   }, [formData, storageKey]);
 
@@ -390,55 +448,24 @@ export default function StepOptionMeetingPickup() {
         transportModeId: formData.arrivalMethod === 'pickupService' ? 
           availableTransportModes.find(mode => mode.name.toLowerCase() === formData.transportMode)?.id || undefined : undefined
       };
-
-      console.log('StepOptionMeetingPickup: Enviando datos a la API:', apiRequest);
       
-      // Verificar datos del Meeting Point
-      if (formData.arrivalMethod === 'meetingPoint') {
-        console.log('StepOptionMeetingPickup: Datos del Meeting Point:', {
-          meetingPointId: availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id,
-          meetingPointAddress: formData.meetingPointAddress,
-          meetingPointDescription: formData.meetingPointDescription,
-          meetingPointLatitude: formData.meetingPointLatitude,
-          meetingPointLongitude: formData.meetingPointLongitude
-        });
-      }
       
-      // Verificar datos de Pickup Points
-      if (formData.arrivalMethod === 'pickupService') {
-        console.log('StepOptionMeetingPickup: Datos de Pickup Points (REFERENCE_CITY_WITH_LIST):', {
-          meetingPointDescription: formData.pickupDescription, // Descripción para REFERENCE_CITY_WITH_LIST
-          pickupPoints: formData.pickupAddresses.map((address, index) => {
-            const coordsMatch = address.match(/\(([-\d.]+),\s*([-\d.]+)\)/);
-            const lat = coordsMatch ? parseFloat(coordsMatch[1]) : 0;
-            const lng = coordsMatch ? parseFloat(coordsMatch[2]) : 0;
-            const nameMatch = address.match(/^([^-]+)/);
-            const name = nameMatch ? nameMatch[1].trim() : `Punto de recogida ${index + 1}`;
-            const cleanAddress = address.replace(/^[^-]+-\s*/, '').replace(/\s*\([-\d.,\s]+\)$/, '');
-            
-            return {
-              cityId: availableCities.find(city => city.cityName.toLowerCase() === formData.originCity)?.id || 0,
-              name: name,
-              address: cleanAddress,
-              latitude: lat,
-              longitude: lng,
-              notes: formData.pickupAddressNotes[index] || '' // Usar notas de la lista
-            };
-          })
-        });
-      }
       
       // Consumir la API
       const response = await bookingOptionApi.createBookingOptionMeetingPickup(apiRequest);
       
       if (response.success) {
-        console.log('StepOptionMeetingPickup: API consumida exitosamente:', response);
         
         // Guardar el ID creado en localStorage para uso posterior
         localStorage.setItem(`meetingPickupId_${optionId}`, response.idCreated);
         
         // Navegar a la siguiente página
-        navigate(`/extranet/activity/availabilityPricing?optionId=${response.idCreated}`);
+        navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?optionId=${response.idCreated}`, {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
       } else {
         console.error('StepOptionMeetingPickup: Error en la API:', response.message);
         alert(`Error al guardar la configuración: ${response.message}`);
@@ -452,8 +479,12 @@ export default function StepOptionMeetingPickup() {
   };
 
   const handleBack = () => {
-    console.log('StepOptionMeetingPickup: Datos mantenidos en localStorage al regresar');
-    navigate('/extranet/activity/createOptionSettings');
+    navigateToActivityStep(navigate, '/extranet/activity/createOptionSettings', {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   if (!optionId) {
@@ -467,6 +498,26 @@ export default function StepOptionMeetingPickup() {
                   <span className="visually-hidden">Cargando...</span>
                 </div>
                 <p className="text-muted">Cargando configuración del punto de encuentro...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </OptionSetupLayout>
+    );
+  }
+
+  // Si está cargando los datos de la opción de reserva
+  if (isLoading) {
+    return (
+      <OptionSetupLayout currentSection="meetingPickup">
+        <div className="container-fluid">
+          <div className="row">
+            <div className="col-12">
+              <div className="text-center py-5">
+                <div className="spinner-border text-primary mb-3" role="status">
+                  <span className="visually-hidden">Cargando configuración de encuentro y pickup...</span>
+                </div>
+                <p className="text-muted">Cargando configuración de encuentro y pickup...</p>
               </div>
             </div>
           </div>
@@ -514,7 +565,12 @@ export default function StepOptionMeetingPickup() {
                   <hr />
                   <button 
                     className="btn btn-outline-warning btn-sm"
-                    onClick={() => navigate('/extranet/activity/createCategory')}
+                    onClick={() => navigateToActivityStep(navigate, '/extranet/activity/createCategory', {
+                      activityId,
+                      lang,
+                      currency,
+                      currentStep
+                    })}
                   >
                     <i className="fas fa-arrow-left me-2"></i>
                     {language === 'es' ? 'Ir a Categoría' : 'Go to Category'}
@@ -544,7 +600,7 @@ export default function StepOptionMeetingPickup() {
 
                 {/* ¿Cómo llegan los clientes a la actividad? */}
                 <div className="mb-4">
-                  <h6 className="fw-bold mb-3">{getTranslation('stepMeetingPickup.arrivalMethod.description', language)}</h6>
+                  <h6 className="fw-bold mb-3">{getTranslation('stepMeetingPickup.howToArrive', language)}</h6>
                   <div className="form-check mb-2">
                     <input
                       className="form-check-input"
@@ -577,10 +633,6 @@ export default function StepOptionMeetingPickup() {
 
                 {/* Ciudad de Origen - Siempre visible */}
                 <div className="mb-4">
-                  <h6 className="fw-bold mb-3">{getTranslation('stepMeetingPickup.originCity.title', language)}</h6>
-                  <p className="text-muted mb-3">
-                    {getTranslation('stepMeetingPickup.originCity.description', language)}
-                  </p>
                   <div className="row">
                     <div className="col-md-6">
                       <label className="form-label fw-bold">{getTranslation('stepMeetingPickup.originCity.label', language)}</label>
@@ -633,7 +685,7 @@ export default function StepOptionMeetingPickup() {
                             ) : (
                               availableCities.map((city) => (
                                 <option key={city.id} value={city.cityName.toLowerCase()}>
-                                  {city.cityName}
+                                  {city.cityName.charAt(0).toUpperCase() + city.cityName.slice(1)}
                                 </option>
                               ))
                             )}
@@ -818,7 +870,7 @@ export default function StepOptionMeetingPickup() {
                 )}
 
                 {/* Descripción del servicio de recogida */}
-                {formData.arrivalMethod === 'pickupService' && (
+                {formData.arrivalMethod !== 'pickupService' && formData.arrivalMethod !== 'meetingPoint' && (
                   <div className="mb-4">
                     <h6 className="fw-bold mb-3">{getTranslation('stepMeetingPickup.pickupDescription.optional', language)}</h6>
                                           <p className="text-muted mb-3">

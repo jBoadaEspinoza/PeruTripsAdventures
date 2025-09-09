@@ -4,6 +4,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import OptionSetupLayout from '../../../components/OptionSetupLayout';
 import { useAppSelector } from '../../../redux/store';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import { bookingOptionApi, AvailabilityPricingMode } from '../../../api/bookingOption';
 import { appConfig } from '../../../config/appConfig';
 
@@ -45,7 +47,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { activityId } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency } = useActivityParams();
   
   // Get current step from URL params, default to step 1 (Horario)
   const currentStep = parseInt(searchParams.get('step') || '1');
@@ -301,8 +304,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
 
   const optionId = searchParams.get('optionId');
-  const lang = searchParams.get('lang');
-  const currency = searchParams.get('currency');
   const storageKey = `schedule_${optionId || 'default'}`;
 
   // Función para obtener el modo de disponibilidad y precios
@@ -752,7 +753,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         localStorage.setItem(`${storageKey}_pricingType`, pricingType);
         
         // Navegar al step 3
-        navigate(`/extranet/activity/availabilityPricing?step=3&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+        navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?step=3&optionId=${optionId}`, {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
         return;
       }
       
@@ -792,7 +798,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           alert('¡Configuración de capacidad guardada exitosamente! Redirigiendo al siguiente paso...');
           
           // Navegar al step 4
-          navigate(`/extranet/activity/availabilityPricing/create?step=4&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+          navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing/create?step=4&optionId=${optionId}`, {
+            activityId,
+            lang,
+            currency,
+            currentStep
+          });
           return;
         } else {
           console.error('StepOptionAvailabilityPricingDepartureTime: Error al guardar capacidad:', response.message);
@@ -1753,7 +1764,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                    localStorage.setItem(`${storageKey}_pricingType`, pricingType);
                                    
                                    // Continuar al step 3
-                                   navigate(`/extranet/activity/availabilityPricing?step=3&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+                                   navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?step=3&optionId=${optionId}`, {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
                                  }}
                                >
                                  <i className="fas fa-arrow-right me-2"></i>

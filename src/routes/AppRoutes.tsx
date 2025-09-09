@@ -62,7 +62,7 @@ const AppRoutes: React.FC = () => {
         <Route path="activity/createCategory" element={<StepCategory />} />
         <Route path="activity/createTitle" element={<StepTitle />} />
         <Route path="activity/createDescription" element={<StepDescription />} />
-        <Route path="activity/createRecommendation" element={<StepRecommendation />} />
+        <Route path="activity/createRecommendations" element={<StepRecommendation />} />
         <Route path="activity/createRestrictions" element={<StepRestriction />} />
         <Route path="activity/createInclude" element={<StepInclude />} />
         <Route path="activity/createNotIncluded" element={<StepNotInclude />} />

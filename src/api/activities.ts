@@ -2,6 +2,8 @@ import { apiGet } from './apiConfig';
 import { apiPost } from './apiConfig';
 import { getRuc } from '../utils/configUtils';
 
+
+
 export interface ActivityImage {
   id: number;
   imageUrl: string;
@@ -203,6 +205,17 @@ export interface CreateNotIncludesResponse {
   message: string;
 }
 
+export interface currentStepResponse {
+  success: boolean;
+  message: string;
+  data:{
+    currentStep: number;
+    currentLink: string;
+    nextLink: string;
+    previousLink: string;
+  }
+}
+
 export interface ActivityImageData{
   url: string;
   cover?: boolean;
@@ -228,6 +241,8 @@ export interface GetActivityByIdResponse {
   data?: Activity;
   message?: string;
 }
+
+
 
 export const activitiesApi = {
   search: async (params: SearchParams): Promise<SearchResponse> => {
@@ -538,6 +553,42 @@ export const activitiesApi = {
       return {
         success: false,
         message: 'Error al crear imagenes de la actividad'
+      };
+    }
+  },
+  getCurrentStep: async (activityId: string): Promise<currentStepResponse> => {
+    try{
+      const response = await apiGet<currentStepResponse>(`/activities/${activityId}/current-step`);
+      
+      // Validar que la respuesta tenga la estructura esperada
+      if (response && typeof response === 'object') {
+        // Si la respuesta tiene la estructura correcta, devolverla
+        if ('success' in response && 'data' in response) {
+          return response as currentStepResponse;
+        }
+        
+        // Intentar extraer los datos de la respuesta
+        const responseAny = response as any;
+        if (responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data) {
+          return responseAny.data as currentStepResponse;
+        }
+      }
+      
+      return response;
+    }
+    catch(error: any){
+      console.error('Activities API: Error getting current step:', error);
+      
+      // Retornar una respuesta de error en lugar de lanzar la excepción
+      return {
+        success: false,
+        message: 'Error al obtener el paso actual de la actividad',
+        data: {
+          currentStep: 0,
+          currentLink: '',
+          nextLink: '',
+          previousLink: ''
+        }
       };
     }
   }

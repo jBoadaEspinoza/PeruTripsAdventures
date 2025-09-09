@@ -7,14 +7,17 @@ import ActivityTypeModal from '../../../components/ActivityTypeModal';
 import LocationSelectionModal from '../../../components/LocationSelectionModal';
 import DurationModal from '../../../components/DurationModal';
 import VehicleTypeModal from '../../../components/VehicleTypeModal';
-import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep, addItineraryDay, updateItineraryDay, removeItineraryDay, addItineraryItem } from '../../../redux/activityCreationSlice';
+import { useAppDispatch, useAppSelector } from '../../../redux/store';
+import { addItineraryDay, updateItineraryDay, removeItineraryDay, addItineraryItem } from '../../../redux/activityCreationSlice';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepItinerary: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const dispatch = useAppDispatch();
-  const { activityId, selectedCategory, itinerary } = useAppSelector(state => state.activityCreation);
+  const { activityId, lang, currency, currentStep } = useActivityParams();
+  const { selectedCategory, itinerary } = useAppSelector((state: any) => state.activityCreation);
   const [showItineraryCreator, setShowItineraryCreator] = useState(false);
   
   // Modal states
@@ -43,9 +46,7 @@ const StepItinerary: React.FC = () => {
     activityType: ''
   });
 
-  useEffect(() => {
-    dispatch(setCurrentStep(10)); // StepItinerary is step 10
-  }, [dispatch]);
+  // No need to set current step in Redux anymore, it comes from URL
 
   useEffect(() => {
     if (!activityId) {
@@ -55,11 +56,21 @@ const StepItinerary: React.FC = () => {
   }, [activityId, navigate]);
 
   const handleBack = () => {
-    navigate('/extranet/activity/createOptions');
+    navigateToActivityStep(navigate, '/extranet/activity/createOptions', {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   const handleContinue = () => {
-    navigate('/extranet/activity/review');
+    navigateToActivityStep(navigate, '/extranet/activity/review', {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   const handleCreateItinerary = () => {
@@ -248,7 +259,7 @@ const StepItinerary: React.FC = () => {
                     {/* Left side - Itinerary Summary or Example */}
                     <div className="col-md-6">
                       <div className="border rounded p-4 h-100">
-                        {itinerary.some(day => day.items && day.items.length > 0) ? (
+                        {itinerary.some((day: any) => day.items && day.items.length > 0) ? (
                           /* Real Itinerary Summary */
                           <div>
                             <h6 className="text-primary mb-3">
@@ -271,7 +282,7 @@ const StepItinerary: React.FC = () => {
                               
                               {/* Timeline items for all days */}
                               <div className="ms-5">
-                                {itinerary.map((day, dayIndex) => (
+                                {itinerary.map((day: any, dayIndex: number) => (
                                   day.items && day.items.length > 0 && (
                                     <div key={day.id} className="mb-4">
                                       {/* Day header */}
@@ -289,7 +300,7 @@ const StepItinerary: React.FC = () => {
                                       
                                       {/* Day items */}
                                       <div className="ms-4">
-                                        {day.items.map((item, itemIndex) => (
+                                        {day.items.map((item: any, itemIndex: number) => (
                                           <div key={item.id} className="d-flex align-items-start mb-2">
                                             <div 
                                               className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${getIconColorClass(item.activityType || '', item.type)}`}
@@ -441,11 +452,11 @@ const StepItinerary: React.FC = () => {
                     </div>
                     
                     {itinerary.length === 0 ? (
-                      <div className="text-center py-5">
+                <div className="text-center py-5">
                         <i className="fas fa-calendar-plus fa-3x text-muted mb-3"></i>
                         <h5 className="text-muted mb-3">
                           {getTranslation('stepItinerary.noDays', language)}
-                        </h5>
+                  </h5>
                         <button
                           type="button"
                           className="btn btn-primary"
@@ -457,7 +468,7 @@ const StepItinerary: React.FC = () => {
                       </div>
                     ) : (
                       <div>
-                        {itinerary.map((day, index) => (
+                        {itinerary.map((day: any, index: number) => (
                           <div key={day.id} className="card mb-3">
                             <div className="card-body">
                               <div className="d-flex justify-content-between align-items-center mb-3">
@@ -515,7 +526,7 @@ const StepItinerary: React.FC = () => {
                                     
                                     {/* Timeline items */}
                                     <div className="ms-5">
-                                      {day.items.map((item, itemIndex) => (
+                                      {day.items.map((item: any, itemIndex: number) => (
                                         <div key={item.id} className="d-flex align-items-start mb-3">
                                           {/* Icon based on type and activity */}
                                           <div 
@@ -599,7 +610,7 @@ const StepItinerary: React.FC = () => {
                         </div>
                       </div>
                     )}
-                  </div>
+                </div>
                 )}
               </div>
             </div>
@@ -608,15 +619,15 @@ const StepItinerary: React.FC = () => {
 
         {/* Botones de navegación - Solo mostrar si no estamos en el creador de itinerarios */}
         {!showItineraryCreator && (
-          <div className="row mt-4">
-            <div className="col-12 d-flex justify-content-between">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleBack}
-              >
-                <i className="fas fa-arrow-left me-2"></i>
-                {getTranslation('common.back', language)}
+        <div className="row mt-4">
+          <div className="col-12 d-flex justify-content-between">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleBack}
+            >
+              <i className="fas fa-arrow-left me-2"></i>
+              {getTranslation('common.back', language)}
               </button>  
               <button
                 type="button"

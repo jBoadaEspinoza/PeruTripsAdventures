@@ -6,13 +6,14 @@ import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
 import { activitiesApi } from '../../../api/activities';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 interface StepTitleProps {
   activityId?: string;
 }
 
-const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
+const StepTitle: React.FC<StepTitleProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
@@ -21,18 +22,35 @@ const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [activityData, setActivityData] = useState<any>(null);
   const hasRedirected = useRef(false);
-
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId: reduxActivityId, selectedCategory } = useAppSelector(state => state.activityCreation);
+  const { activityId, lang, currency } = useActivityParams();
   
-  // Usar activityId de props, Redux, o location.state
-  const currentActivityId = activityId || reduxActivityId || location.state?.activityId;
+  // Usar activityId de URL
+  const currentActivityId = activityId;
 
-  // Set current step when component mounts
+  // Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(2)); // StepTitle is step 2
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!currentActivityId) return;
+      await withLoading(async () => {
+        try {
+          const activityData = await activitiesApi.getById(currentActivityId, language, currency.toUpperCase());
+          console.log('activityData', activityData);
+          setActivityData(activityData);
+          // Siempre cargar el título si existe, incluso si está vacío
+          if (activityData) {
+            setTitle(activityData.title || '');
+          }
+        } catch (error) {
+          console.error('Error loading activity data:', error);
+          // No mostrar error al usuario, solo log para debugging
+        }
+      }, 'load-activity-data');
+    };
+
+    loadActivityData();
+  }, [currentActivityId, language, currency]);
 
   // Validar el límite de caracteres del título
   useEffect(() => {
@@ -64,27 +82,20 @@ const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
   };
 
   useEffect(() => {
-    // Solo redirigir si no hay activityId en ningún lugar y no se ha redirigido antes
+    // Solo redirigir si no hay activityId y no se ha redirigido antes
     if (!currentActivityId && !hasRedirected.current) {
-      console.log('StepTitle: No se encontró activityId, redirigiendo a createCategory');
       hasRedirected.current = true;
-      navigate('/extranet/activity/createCategory');
+      navigateToActivityStep(navigate, '/extranet/activity/createCategory', {
+        activityId,
+        lang,
+        currency,
+        currentStep: 1
+      });
     } else if (currentActivityId) {
       // Resetear el flag de redirección si encontramos un activityId
       hasRedirected.current = false;
     }
-  }, [currentActivityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepTitle - ActivityId:', currentActivityId);
-    console.log('StepTitle - SelectedCategory:', selectedCategory);
-  }, [currentActivityId, selectedCategory]);
-
-  // Log para debugging del título y errores
-  useEffect(() => {
-    console.log('StepTitle: Renderizando, titleError:', titleError, 'title length:', title.length);
-  }, [titleError, title.length]);
+  }, [currentActivityId, navigate, lang, currency]);
 
   const handleSaveAndExit = async () => {
     if (!title.trim()) {
@@ -113,7 +124,6 @@ const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
           setError(response.message || getTranslation('stepTitle.error.saveFailed', language));
         }
       } catch (error) {
-        console.error('Error saving title:', error);
         setError(getTranslation('stepTitle.error.saveFailed', language));
       }
     }, 'save-loading');
@@ -140,8 +150,12 @@ const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
         });
 
         if (response.success) {
-          // Navigate to next step (StepDescription)
-          navigate('/extranet/activity/createDescription');
+          navigateToActivityStep(navigate, '/extranet/activity/createDescription', {
+            activityId,
+            lang,
+            currency,
+            currentStep: 3
+          });
         } else {
           setError(response.message || getTranslation('stepTitle.error.saveFailed', language));
         }
@@ -224,6 +238,7 @@ const StepTitle: React.FC<StepTitleProps> = ({ activityId }) => {
               >
                 {getTranslation('stepTitle.saveAndExit', language)}
               </button>
+              
               <button 
                 className="btn btn-primary" 
                 onClick={handleContinue}

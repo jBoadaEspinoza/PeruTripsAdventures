@@ -21,9 +21,19 @@ export interface BookingOption {
     pricingMode: string;
     availabilityMode: string;
     isOpenDuration: boolean;
+    validityDays: number;
     defaultCutoffMinutes: number;
     lastMinuteAfterFirst: boolean;
     isActive: boolean;
+    meetingPointDescription: string;
+    meetingPointAddress: string | null;
+    meetingPointLatitude: number | null;
+    meetingPointLongitude: number | null;
+    meetingPointPointId: number | null;
+    returnToMeetingPoint: boolean;
+    meetingPointId: number;
+    meetingPointCity: string;
+    meetingPointCountry: string;
     schedules: Schedule[];
     priceTiers: PriceTier[];
   }
@@ -282,6 +292,13 @@ export interface BookingOptionResponse{
     successCode: string;
     message: string;
     data: BookingOption[];
+}
+
+export interface BookingOptionByIdResponse{
+    success: boolean;
+    successCode: string;
+    message: string;
+    data: BookingOption;
 }
 
 export const bookingOptionApi = {
@@ -632,6 +649,29 @@ export const bookingOptionApi = {
                 success: false,
                 message: 'Error al crear la opción de reserva',
                 idCreated: ''
+            }
+        }
+    },
+    searchBookingOptionById: async(activityId: string, optionId: string, language: string, currency: string): Promise<BookingOptionByIdResponse> => {
+        try {
+            const response = await apiGet<BookingOptionByIdResponse>(`/booking-options/search?activityId=${activityId}&optionId=${optionId}&language=${language}&currency=${currency}`);
+            if(response && typeof response === 'object'){
+                if('success' in response && 'successCode' in response && 'message' in response && 'data' in response){
+                    return response as BookingOptionByIdResponse;
+                }
+            }
+            const responseAny = response as any;
+            if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+                return responseAny.data as BookingOptionByIdResponse;
+            }
+            return response;
+        } catch (error: any) {
+            console.error('Booking Option API: Error getting booking option by id:', error);
+            return {
+                success: false,
+                successCode: 'ERROR',
+                message: 'Error de conexión al obtener la opción de reserva',
+                data: {} as BookingOption
             }
         }
     },

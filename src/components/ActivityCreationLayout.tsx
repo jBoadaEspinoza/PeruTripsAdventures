@@ -2,8 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslation } from '../utils/translations';
-import { useAppSelector, useAppDispatch } from '../redux/store';
-import { setCurrentStep } from '../redux/activityCreationSlice';
+import { useActivityParams } from '../hooks/useActivityParams';
 
 interface ActivityCreationLayoutProps {
   children: React.ReactNode;
@@ -15,11 +14,10 @@ const ActivityCreationLayout: React.FC<ActivityCreationLayoutProps> = ({
   totalSteps
 }) => {
   const { language, setLanguage } = useLanguage();
-  const dispatch = useAppDispatch();
   const location = useLocation();
   
-  // Obtener currentStep desde Redux
-  const { currentStep } = useAppSelector(state => state.activityCreation);
+  // Obtener currentStep desde URL
+  const { currentStep = 1 } = useActivityParams();
 
   const progressPercentage = Math.round((currentStep / totalSteps) * 100);
 
@@ -28,6 +26,8 @@ const ActivityCreationLayout: React.FC<ActivityCreationLayoutProps> = ({
     setLanguage(newLanguage);
   };
 
+  const { activityId, lang, currency } = useActivityParams();
+  
   const steps = [
     { id: 'category', title: getTranslation('activityCreation.steps.category', language), path: '/extranet/activity/createCategory', completed: currentStep > 1 },
     { id: 'title', title: getTranslation('activityCreation.steps.title', language), path: '/extranet/activity/createTitle', completed: currentStep > 2 },
@@ -43,6 +43,17 @@ const ActivityCreationLayout: React.FC<ActivityCreationLayoutProps> = ({
 
   const isCurrentStep = (stepPath: string) => {
     return location.pathname === stepPath;
+  };
+
+  const createStepUrl = (stepPath: string) => {
+    const url = new URL(stepPath, window.location.origin);
+    if (activityId) {
+      url.searchParams.set('activityId', activityId);
+    }
+    url.searchParams.set('lang', lang);
+    url.searchParams.set('currency', currency);
+    url.searchParams.set('currentStep', currentStep.toString());
+    return url.pathname + url.search;
   };
 
   return (

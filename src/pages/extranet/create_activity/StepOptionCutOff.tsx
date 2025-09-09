@@ -4,6 +4,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import OptionSetupLayout from '../../../components/OptionSetupLayout';
 import { useAppSelector } from '../../../redux/store';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import { bookingOptionApi } from '../../../api/bookingOption';
 
 interface CutOffData {
@@ -43,7 +45,8 @@ export default function StepOptionCutOff() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { activityId } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
   
   const [formData, setFormData] = useState<CutOffData>({
     defaultCutOffTime: '30',
@@ -247,7 +250,12 @@ export default function StepOptionCutOff() {
         localStorage.setItem(storageKey, JSON.stringify(dataToSave));
         
         // Redirigir al siguiente paso
-        navigate(`/extranet/activity/createOptions`);
+        navigateToActivityStep(navigate, `/extranet/activity/createOptions`, {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
       } else {
         alert(`Error al guardar la configuración: ${response.message}`);
       }
@@ -261,7 +269,12 @@ export default function StepOptionCutOff() {
   };
 
   const handleBack = () => {
-    navigate(`/extranet/activity/availabilityPricing?optionId=${optionId}&lang=${language}`);
+    navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?optionId=${optionId}`, {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   // Función para cambiar la hora límite de una franja horaria específica
@@ -356,7 +369,12 @@ export default function StepOptionCutOff() {
                   <hr />
                   <button 
                     className="btn btn-outline-warning btn-sm"
-                    onClick={() => navigate('/extranet/activity/createCategory')}
+                    onClick={() => navigateToActivityStep(navigate, '/extranet/activity/createCategory', {
+                      activityId,
+                      lang,
+                      currency,
+                      currentStep
+                    })}
                   >
                     <i className="fas fa-arrow-left me-2"></i>
                     {language === 'es' ? 'Ir a Categoría' : 'Go to Category'}

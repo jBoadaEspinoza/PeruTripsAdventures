@@ -4,6 +4,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import OptionSetupLayout from '../../../components/OptionSetupLayout';
 import { useAppSelector } from '../../../redux/store';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import { bookingOptionApi, CreateBookingOptionAvailabilityPricingRequest } from '../../../api/bookingOption';
 
 interface AvailabilityPricingData {
@@ -15,7 +17,8 @@ export default function StepOptionAvailabilityPrice() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { activityId } = useAppSelector(state => state.activityCreation);
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
   
   const [formData, setFormData] = useState<AvailabilityPricingData>({
     availabilityType: 'timeSlots',
@@ -104,7 +107,12 @@ export default function StepOptionAvailabilityPrice() {
         
         // Navegar a la página de creación de horarios con los parámetros requeridos
         const currency = 'PEN'; // Por defecto, se puede obtener del contexto si está disponible
-        navigate(`/extranet/activity/availabilityPricing/create?optionId=${optionId}&lang=${language}&currency=${currency}&step=1`);
+        navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing/create?optionId=${optionId}&step=1`, {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
       } else {
         console.error('StepOptionAvailabilityPrice: Error en la API:', response?.message);
         alert(`Error al crear el horario: ${response?.message || 'Error desconocido'}`);
@@ -121,12 +129,22 @@ export default function StepOptionAvailabilityPrice() {
     console.log('StepOptionAvailabilityPrice: Continuando con datos:', formData);
     // navega a la página de configuración de corte
     const currency = 'PEN'; // Por defecto, se puede obtener del contexto si está disponible
-    navigate(`/extranet/activity/cutOff?optionId=${optionId}&lang=${language}&currency=${currency}`);
+    navigateToActivityStep(navigate, `/extranet/activity/cutOff?optionId=${optionId}`, {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   const handleBack = () => {
     console.log('StepOptionAvailabilityPrice: Datos mantenidos en localStorage al regresar');
-    navigate('/extranet/activity/meetingPickup');
+    navigateToActivityStep(navigate, '/extranet/activity/meetingPickup', {
+      activityId,
+      lang,
+      currency,
+      currentStep
+    });
   };
 
   if (!optionId) {
@@ -167,7 +185,12 @@ export default function StepOptionAvailabilityPrice() {
                   <hr />
                   <button 
                     className="btn btn-outline-warning btn-sm"
-                    onClick={() => navigate('/extranet/activity/createCategory')}
+                    onClick={() => navigateToActivityStep(navigate, '/extranet/activity/createCategory', {
+                      activityId,
+                      lang,
+                      currency,
+                      currentStep
+                    })}
                   >
                     <i className="fas fa-arrow-left me-2"></i>
                     {language === 'es' ? 'Ir a Categoría' : 'Go to Category'}

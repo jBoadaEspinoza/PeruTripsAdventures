@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../config/firebase';
 
 export interface UploadProgress {
@@ -184,5 +184,33 @@ export class FirebaseService {
     }
 
     return true;
+  }
+
+  /**
+   * Elimina un archivo de Firebase Storage
+   * @param url - URL completa del archivo a eliminar
+   * @returns Promise que se resuelve cuando se elimina el archivo
+   */
+  static async deleteFile(url: string): Promise<void> {
+    try {
+      // Extraer la ruta del archivo desde la URL
+      const urlObj = new URL(url);
+      const path = decodeURIComponent(urlObj.pathname.split('/o/')[1]?.split('?')[0] || '');
+      
+      if (!path) {
+        throw new Error('No se pudo extraer la ruta del archivo desde la URL');
+      }
+
+      // Crear referencia al archivo
+      const fileRef = ref(storage, path);
+      
+      // Eliminar el archivo
+      await deleteObject(fileRef);
+      
+      console.log('Archivo eliminado exitosamente:', path);
+    } catch (error) {
+      console.error('Error eliminando archivo de Firebase:', error);
+      throw error;
+    }
   }
 } 

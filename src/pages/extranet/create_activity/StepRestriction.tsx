@@ -1,42 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepRestriction: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
+  const hasRedirected = useRef(false);
+  const [activityData, setActivityData] = useState<any>(null);
   const [restrictions, setRestrictions] = useState<string[]>([]); // Start with no restrictions
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
-
-  // Set current step when component mounts
+  // Obtener parámetros de URL
+  const { activityId, lang, currency, currentStep } = useActivityParams();
+  
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(5)); // StepRestriction is step 5
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+        
+        // Cargar recomendaciones si existen
+        if (activityData && activityData.restrictions) {
+          if (Array.isArray(activityData.restrictions)) {
+            // Es opcional, si no hay, se crea un array vacío
+            const loadedRestrictions = [...activityData.restrictions];
+            if (loadedRestrictions.length === 0) {
+              loadedRestrictions.push('');
+            }
+            setRestrictions(loadedRestrictions);
+          } else {
+            setRestrictions([]);
+          }
+        }
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
 
   useEffect(() => {
-    // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepRestriction: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    // Solo redirigir si no hay activityId y no se ha redirigido antes
+    if (!activityId && !hasRedirected.current){
+        hasRedirected.current = true;
+        navigate('/extranet/login');
+      } else if (activityId) {
+        hasRedirected.current = false;
     }
-  }, [activityId, navigate]);
-
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepRestriction - ActivityId:', activityId);
-    console.log('StepRestriction - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
+  }, [activityId, navigate, lang, currency]);
 
   const addRestriction = () => {
     setRestrictions([...restrictions, '']);
@@ -51,6 +71,32 @@ const StepRestriction: React.FC = () => {
     const newRestrictions = [...restrictions];
     newRestrictions[index] = value;
     setRestrictions(newRestrictions);
+  };
+
+  const handleSaveAndExit = async () => {
+    const validRestrictions = restrictions.filter(rest => rest.trim().length > 0);
+    if (validRestrictions.length === 0) {
+      setError(getTranslation('stepRestriction.error.emptyRestrictionsNotAllowed', language));
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        // Call createRestrictions API
+        const response = await activitiesApi.createRestrictions({
+          id: activityId!,
+          restrictions: validRestrictions,
+          lang: language
+        });
+        if (response.success) {
+          navigate('/extranet/dashboard');
+        } else {
+          setError(response.message || getTranslation('stepRestriction.error.saveFailed', language));
+        }
+      } catch (error) {
+        setError(getTranslation('stepRestriction.error.saveFailed', language));
+      }
+    }, 'save-loading');
   };
 
   const handleContinue = async () => {
@@ -79,16 +125,25 @@ const StepRestriction: React.FC = () => {
         }
 
         // Navigate to next step (StepInclude)
-        navigate('/extranet/activity/createInclude');
+        navigateToActivityStep(navigate, '/extranet/activity/createInclude', {
+          activityId,
+          lang,
+          currency,
+          currentStep:6
+        });
       } catch (error) {
-        console.error('Error saving restrictions:', error);
         setError(getTranslation('stepRestriction.error.saveFailed', language));
       }
     }, 'save-loading');
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createRecommendation');
+    navigateToActivityStep(navigate, '/extranet/activity/createRecommendations', {
+      activityId,
+      lang,
+      currency,
+      currentStep:4
+    });
   };
 
   return (
@@ -195,7 +250,7 @@ const StepRestriction: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
               >
                 {getTranslation('stepRestriction.saveAndExit', language)}
               </button>

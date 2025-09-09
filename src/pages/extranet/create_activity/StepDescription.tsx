@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
 import { getTranslation } from '../../../utils/translations';
 import ActivityCreationLayout from '../../../components/ActivityCreationLayout';
 import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 import { useAppSelector, useAppDispatch } from '../../../redux/store';
-import { setCurrentStep } from '../../../redux/activityCreationSlice';
 import { activitiesApi } from '../../../api/activities';
+import { useActivityParams } from '../../../hooks/useActivityParams';
+import { navigateToActivityStep } from '../../../utils/navigationUtils';
 
 const StepDescription: React.FC = () => {
   const navigate = useNavigate();
@@ -15,33 +16,89 @@ const StepDescription: React.FC = () => {
   const dispatch = useAppDispatch();
   const [presentation, setPresentation] = useState('');
   const [description, setDescription] = useState('');
+  const [activityData, setActivityData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasRedirected = useRef(false);
 
   // Character limits
   const PRESENTATION_LIMIT = 200;
   const DESCRIPTION_LIMIT = 3000;
 
-  // Obtener activityId y selectedCategory desde Redux
-  const { activityId, selectedCategory } = useAppSelector(state => state.activityCreation);
-
-  // Set current step when component mounts
+  // Obtener parámetros de URL
+  const { activityId, lang, currency } = useActivityParams();
+  
+  //Cargar datos existentes de la actividad
   useEffect(() => {
-    dispatch(setCurrentStep(3)); // StepDescription is step 3
-  }, [dispatch]);
+    const loadActivityData = async () => {
+      if (!activityId) return;
+      await withLoading(async () => {
+        const activityData = await activitiesApi.getById(activityId, lang, currency.toUpperCase());
+        setActivityData(activityData);
+        
+        // Cargar presentation si existe
+        if (activityData && activityData.presentation) {
+          setPresentation(activityData.presentation || '');
+        }
+        
+        // Cargar description si existe (convertir array a string separado por \n)
+        if (activityData && activityData.description) {
+          if (Array.isArray(activityData.description)) {
+            setDescription(activityData.description.join('\n\n'));
+          } else {
+            setDescription(activityData.description || '');
+          }
+        }
+      }, 'load-activity-data');
+    };
+    loadActivityData();
+  }, [activityId, lang, currency]);
 
   useEffect(() => {
-    // Verificar que tenemos activityId antes de continuar
-    if (!activityId) {
-      console.log('StepDescription: No se encontró activityId, redirigiendo a createCategory');
-      navigate('/extranet/activity/createCategory');
+    // Solo redirigir si no hay activityId y no se ha redirigido antes
+    if (!activityId && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate('/extranet/login');
+    } else if (activityId) {
+      // Resetear el flag de redirección si encontramos un activityId
+      hasRedirected.current = false;
     }
-  }, [activityId, navigate]);
+  }, [activityId, navigate, lang, currency]);
 
-  // Log para debugging
-  useEffect(() => {
-    console.log('StepDescription - ActivityId:', activityId);
-    console.log('StepDescription - SelectedCategory:', selectedCategory);
-  }, [activityId, selectedCategory]);
+  const handleSaveAndExit = async () => {
+    if (!presentation.trim() || !description.trim()) {
+      setError(getTranslation('stepDescription.error.bothFieldsRequired', language));
+      return;
+    }
+
+    if (presentation.length > PRESENTATION_LIMIT) {
+      setError(getTranslation('stepDescription.error.presentationTooLong', language));
+      return;
+    }
+
+    if (description.length > DESCRIPTION_LIMIT) {
+      setError(getTranslation('stepDescription.error.descriptionTooLong', language));
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        // Call createDescription API
+        const response = await activitiesApi.createDescription({
+          id: activityId!,
+          presentation: presentation.trim(),
+          description: description.trim(),
+          lang: language
+        });
+        if (response.success) {
+          navigate('/extranet/dashboard');
+        } else {
+          setError(response.message || getTranslation('stepDescription.error.saveFailed', language));
+        }
+      } catch (error) {
+        setError(getTranslation('stepDescription.error.saveFailed', language));
+      }
+    }, 'save-loading');
+  };
 
   const handleContinue = async () => {
     if (!presentation.trim() || !description.trim()) {
@@ -70,20 +127,29 @@ const StepDescription: React.FC = () => {
         });
 
         if (response.success) {
-          // Navigate to next step (StepRecommendation)
-          navigate('/extranet/activity/createRecommendation');
+          navigateToActivityStep(navigate, '/extranet/activity/createRecommendations', {
+            activityId,
+            lang,
+            currency,
+            currentStep: 4
+          });
         } else {
           setError(response.message || getTranslation('stepDescription.error.saveFailed', language));
         }
       } catch (error) {
-        console.error('Error saving description:', error);
         setError(getTranslation('stepDescription.error.saveFailed', language));
       }
     }, 'save-loading');
   };
 
   const handleBack = () => {
-    navigate('/extranet/activity/createTitle');
+    //redirigir a createTitle
+    navigateToActivityStep(navigate, '/extranet/activity/createTitle', {
+      activityId,
+      lang,
+      currency,
+      currentStep: 2
+    });
   };
 
   return (
@@ -118,7 +184,7 @@ const StepDescription: React.FC = () => {
                   <textarea
                     className="form-control"
                     rows={4}
-                    value={presentation}
+                    value={activityData?.presentation || presentation}
                     onChange={(e) => setPresentation(e.target.value)}
                     placeholder={getTranslation('stepDescription.presentation.placeholder', language)}
                     maxLength={PRESENTATION_LIMIT}
@@ -182,7 +248,7 @@ const StepDescription: React.FC = () => {
             <div>
               <button 
                 className="btn btn-outline-primary me-2" 
-                onClick={() => navigate('/extranet/dashboard')}
+                onClick={handleSaveAndExit}
               >
                 {getTranslation('stepDescription.saveAndExit', language)}
               </button>

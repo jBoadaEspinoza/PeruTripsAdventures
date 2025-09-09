@@ -77,6 +77,38 @@ const ExtranetActivities: React.FC = () => {
     }
     setFilteredActivities(filtered);
   }, [activities, searchTerm, selectedStatus]);
+  const handleEditActivity = async (activityIdToEdit: string) => {
+     alert('Editar actividad');
+  }
+  const handleFinishProcessActivity = async (activityIdToEdit: string) => {
+    try {
+      await withLoading(async () => {
+        // Consumir la API getCurrentStep
+        const response = await activitiesApi.getCurrentStep(activityIdToEdit);
+        
+        if (response.success && response.data) {
+          const { currentLink, currentStep: apiCurrentStep } = response.data;
+          
+          // Construir la URL con los parámetros necesarios
+          const url = new URL(currentLink, window.location.origin);
+          url.searchParams.set('activityId', activityIdToEdit);
+          url.searchParams.set('lang', language);
+          url.searchParams.set('currency', currency);
+          url.searchParams.set('currentStep', apiCurrentStep.toString());
+          
+          // Redireccionar a la página correspondiente
+          navigate(url.pathname + url.search);
+        } else {
+          // Si no hay currentLink, redirigir a la página de categoría por defecto
+          navigate(`/extranet/activity/createCategory?activityId=${activityIdToEdit}&lang=${language}&currency=${currency}`);
+        }
+      }, 'edit-activity-loading');
+    } catch (error) {
+      console.error('Error getting current step:', error);
+      // En caso de error, redirigir a la página de categoría por defecto
+      navigate(`/extranet/activity/createCategory?activityId=${activityIdToEdit}&lang=${language}&currency=${currency}`);
+    }
+  };
 
   const handleDeleteActivity = async (activityId: string) => {
     if (window.confirm(getTranslation('activities.delete.confirm', language))) {
@@ -214,7 +246,7 @@ const ExtranetActivities: React.FC = () => {
       {/* Activities Table */}
       <div className="card border-0 shadow-sm">
         <div className="card-body p-0">
-          <div className="table-responsive">
+          <div className="table-responsive" style={{ maxHeight: 'none', overflow: 'visible' }}>
             <table className="table table-hover mb-0">
               <thead className="bg-light">
                 <tr>
@@ -301,18 +333,116 @@ const ExtranetActivities: React.FC = () => {
                             className="btn btn-outline-primary btn-sm dropdown-toggle"
                             type="button"
                             data-bs-toggle="dropdown"
+                            style={{
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              transition: 'all 0.2s ease',
+                              borderWidth: '1.5px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F54927';
+                              e.currentTarget.style.borderColor = '#F54927';
+                              e.currentTarget.style.color = '#ffffff';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.borderColor = '#F54927';
+                              e.currentTarget.style.color = '#F54927';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
                           >
-                            <span className="d-none d-md-inline">{getTranslation('activities.viewDetails', language)}</span>
-                            <i className="fas fa-ellipsis-v d-md-none"></i>
+                            <span className="d-none d-md-inline me-2">{getTranslation('activities.viewDetails', language)}</span>
+                            <i className="fas fa-chevron-down" style={{ fontSize: '0.75rem' }}></i>
                           </button>
-                          <ul className="dropdown-menu">
-                            <li><a className="dropdown-item" href="#">{getTranslation('activities.edit', language)}</a></li>
-                            <li><a className="dropdown-item" href="#">{getTranslation('activities.duplicate', language)}</a></li>
+                          <ul className="dropdown-menu shadow-sm" style={{
+                            borderRadius: '8px',
+                            padding: '8px 0',
+                            minWidth: '160px',
+                            fontSize: '0.875rem',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            {!activity.isActive && (
+                              <li>
+                              <button 
+                                className="dropdown-item d-flex align-items-center" 
+                                onClick={() => handleFinishProcessActivity(activity.id)}
+                                style={{
+                                  padding: '8px 16px',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <i className="fas fa-check-circle me-2 text-success"></i>
+                                {getTranslation('activities.finishProcess', language)}
+                              </button>
+                            </li>
+                            )}
+                            {activity.isActive && (
+                              <li>
+                                <button 
+                                  className="dropdown-item d-flex align-items-center" 
+                                  onClick={() => handleEditActivity(activity.id)}
+                                  style={{
+                                    padding: '8px 16px',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <i className="fas fa-edit me-2 text-primary"></i>
+                                  {getTranslation('activities.edit', language)}
+                                </button>
+                              </li>
+                            )}
+                            
+                            <li>
+                              <a 
+                                className="dropdown-item d-flex align-items-center" 
+                                href="#"
+                                style={{
+                                  padding: '8px 16px',
+                                  transition: 'all 0.2s ease',
+                                  textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <i className="fas fa-copy me-2 text-warning"></i>
+                                {getTranslation('activities.duplicate', language)}
+                              </a>
+                            </li>
                             <li>
                               <button 
-                                className="dropdown-item text-danger" 
+                                className="dropdown-item d-flex align-items-center text-danger" 
                                 onClick={() => handleDeleteActivity(activity.id)}
+                                style={{
+                                  padding: '8px 16px',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#fef2f2';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
                               >
+                                <i className="fas fa-trash me-2"></i>
                                 {getTranslation('activities.delete', language)}
                               </button>
                             </li>
