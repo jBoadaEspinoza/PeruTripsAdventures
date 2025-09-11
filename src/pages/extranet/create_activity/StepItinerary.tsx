@@ -412,7 +412,7 @@ const StepItinerary: React.FC = () => {
                                   </div>
                                   <div>
                                     <div className="fw-bold">Regresa a: Edinburgh</div>
-                                  </div>
+                </div>
                                 </div>
                               </div>
                             </div>
@@ -640,7 +640,7 @@ const StepItinerary: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+        </div>
 
       {/* Modals */}
       <ActivityTypeModal

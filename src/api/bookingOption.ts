@@ -2,6 +2,15 @@ import { apiGet } from './apiConfig';
 import { apiPost } from './apiConfig';
 import { getRuc } from '../utils/configUtils';
 
+
+export interface ScheduleException {
+    id: number;
+    reason: string;
+    scheduleId: number;
+    date: string;
+    isCancelled: boolean;
+}
+
 export interface BookingOption {
     id: string;
     title: string;
@@ -35,6 +44,7 @@ export interface BookingOption {
     meetingPointCity: string;
     meetingPointCountry: string;
     schedules: Schedule[];
+    scheduleExceptions: ScheduleException[];
     priceTiers: PriceTier[];
   }
   
@@ -222,6 +232,12 @@ export interface CreateBookingOptionSetupRequest{
     durationHours?: number | null;
     durationMinutes?: number | null;
     validityDays?: number | null;
+}
+
+export interface ResetAvailabilityPricingResponse{
+    success: boolean;
+    successCode: string;
+    message: string;
 }
 
 export interface CreateBookingOptionResponse{
@@ -697,6 +713,26 @@ export const bookingOptionApi = {
                 data: []
             }
         }
+    },
+    resetAvailabilityPricing: async (bookingOptionId: string): Promise<ResetAvailabilityPricingResponse> => {
+        try {
+            const response = await apiPost<ResetAvailabilityPricingResponse>(`/booking-options/${bookingOptionId}/resetAvailabilityPricing`);
+            if(response && typeof response === 'object'){
+                if('success' in response && 'successCode' in response && 'message' in response){
+                    return response as ResetAvailabilityPricingResponse;
+                }
+            }
+            const responseAny = response as any;
+            if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+                return responseAny.data as ResetAvailabilityPricingResponse;
+            }
+            return response;
+        } catch (error: any) {
+            return {
+                success: false,
+                successCode: 'NETWORK_ERROR',
+                message: 'Error de conexión al resetear la disponibilidad y precios'
+            }
+        }
     }
-
 }

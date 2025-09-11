@@ -28,6 +28,8 @@ interface ScheduleData {
       id: string;
       hour: string;
       minute: string;
+      endHour?: string;
+      endMinute?: string;
     }>;
   };
   exceptions: Array<{
@@ -42,6 +44,7 @@ interface AgeGroup {
   minAge: number;
   maxAge: number;
 }
+
 
 export default function StepOptionAvailabilityPricingDepartureTime() {
   const { language } = useLanguage();
@@ -75,6 +78,10 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
   const [availabilityPricingMode, setAvailabilityPricingMode] = useState<AvailabilityPricingMode | null>(null);
   const [isLoadingMode, setIsLoadingMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Estado para los datos de la opción de reserva
+  const [bookingOptionData, setBookingOptionData] = useState<any>(null);
+  const [isLoadingBookingOption, setIsLoadingBookingOption] = useState(false);
 
   // Estado para el tipo de precios en step 2
   const [pricingType, setPricingType] = useState<'same' | 'ageBased'>('same');
@@ -297,14 +304,131 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     });
   };
 
-
-
-
-
-
-
   const optionId = searchParams.get('optionId');
   const storageKey = `schedule_${optionId || 'default'}`;
+
+  // Función para obtener los datos de la opción de reserva
+  const fetchBookingOptionData = async () => {
+    if (!optionId || !activityId) return;
+    
+    setIsLoadingBookingOption(true);
+    try {
+      const response = await bookingOptionApi.searchBookingOptionById(
+        activityId, 
+        optionId, 
+        lang || 'es', 
+        currency || 'USD'
+      );
+      
+      if (response.success && response.data) {
+        setBookingOptionData(response.data);
+        
+        // Cargar datos básicos del horario si están disponibles
+        const scheduleData: Partial<ScheduleData> = {};
+        
+        // Cargar nombre del horario y fechas desde los schedules si están disponibles
+        if (response.data.schedules && response.data.schedules.length > 0) {
+          // Usar el título del primer schedule como nombre del horario
+          const firstSchedule = response.data.schedules[0];
+          if (firstSchedule.title) {
+            scheduleData.scheduleName = firstSchedule.title;
+          }
+          
+          // Cargar fechas de inicio y fin si están disponibles
+          if (firstSchedule.seasonStartDate) {
+            scheduleData.startDate = firstSchedule.seasonStartDate;
+          }
+          
+          if (firstSchedule.seasonEndDate) {
+            scheduleData.hasEndDate = true;
+            scheduleData.endDate = firstSchedule.seasonEndDate;
+          }
+        }
+        
+        // Si no hay schedules pero hay otros datos de la opción de reserva, 
+        // intentar cargar información básica desde la opción de reserva
+        if (!scheduleData.scheduleName && response.data.title) {
+          scheduleData.scheduleName = response.data.title;
+        }
+        
+        // Actualizar el estado con los datos básicos cargados
+        if (Object.keys(scheduleData).length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            ...scheduleData
+          }));
+        }
+        
+        // Cargar horarios semanales desde los datos de la opción de reserva
+        if (response.data.schedules && response.data.schedules.length > 0) {
+          const weeklySchedule: { [key: string]: Array<{ id: string; hour: string; minute: string; endHour?: string; endMinute?: string }> } = {};
+          
+          // Inicializar todos los días
+          ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+            weeklySchedule[day] = [];
+          });
+          
+          // Procesar los horarios existentes
+          response.data.schedules.forEach((schedule: any, index: number) => {
+            const dayMap: { [key: number]: string } = {
+              0: 'monday', 1: 'tuesday', 2: 'wednesday', 3: 'thursday',
+              4: 'friday', 5: 'saturday', 6: 'sunday'
+            };
+            
+            const dayKey = dayMap[schedule.dayOfWeek];
+            if (dayKey && schedule.isActive) {
+              const [startHour, startMinute] = schedule.startTime.split(':');
+              const timeSlot: {
+                id: string;
+                hour: string;
+                minute: string;
+                endHour?: string;
+                endMinute?: string;
+              } = {
+                id: `existing_${schedule.id}`,
+                hour: startHour,
+                minute: startMinute
+              };
+              
+              // Si hay hora de fin, agregarla
+              if (schedule.endTime) {
+                const [endHour, endMinute] = schedule.endTime.split(':');
+                timeSlot.endHour = endHour;
+                timeSlot.endMinute = endMinute;
+              }
+              
+              weeklySchedule[dayKey].push(timeSlot);
+            }
+          });
+          
+          // Actualizar el estado con los horarios cargados
+          setFormData(prev => ({
+            ...prev,
+            timeSlots: weeklySchedule
+          }));
+        }
+        
+        // Cargar excepciones de horarios si existen
+        if (response.data.scheduleExceptions && response.data.scheduleExceptions.length > 0) {
+          const loadedExceptions = response.data.scheduleExceptions.map((exception: any) => ({
+            date: exception.date || '',
+            description: exception.reason || ''
+          }));
+          
+          setFormData(prev => ({
+            ...prev,
+            exceptions: loadedExceptions
+          }));
+        }
+      } else {
+        console.error('Error al obtener datos de la opción de reserva:', response.message);
+      }
+    } catch (error) {
+      console.error('Error al obtener datos de la opción de reserva:', error);
+    } finally {
+      setIsLoadingBookingOption(false);
+    }
+  };
 
   // Función para obtener el modo de disponibilidad y precios
   const fetchAvailabilityPricingMode = async () => {
@@ -536,10 +660,11 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     }
   }, [storageKey]);
 
-  // Obtener el modo de disponibilidad al inicializar
+  // Obtener el modo de disponibilidad y datos de la opción de reserva al inicializar
   useEffect(() => {
     fetchAvailabilityPricingMode();
-  }, [optionId]);
+    fetchBookingOptionData();
+  }, [optionId, activityId]);
 
   // Obtener la capacidad cuando se esté en el step 4 y pricingMode == PER_PERSON
   useEffect(() => {
@@ -660,6 +785,23 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           return;
         }
 
+        // Validar rangos de horarios para OPENING_HOURS
+        if (availabilityPricingMode?.availabilityMode === 'OPENING_HOURS') {
+          for (const [day, slots] of Object.entries(formData.timeSlots)) {
+            for (const slot of slots) {
+              if (slot.endHour && slot.endMinute) {
+                const startTime = `${slot.hour}:${slot.minute}`;
+                const endTime = `${slot.endHour}:${slot.endMinute}`;
+                
+                if (startTime === endTime) {
+                  alert(`Error: En ${day}, el horario de inicio y fin no pueden ser iguales (${startTime})`);
+                  return;
+                }
+              }
+            }
+          }
+        }
+
         // Validar que las excepciones tengan fechas válidas
         for (let i = 0; i < formData.exceptions.length; i++) {
           const exception = formData.exceptions[i];
@@ -692,12 +834,17 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                 'friday': 4, 'saturday': 5, 'sunday': 6
               };
               
-              return {
+              const scheduleItem: any = {
                 dayOfWeek: dayMap[day] || 0,
-                startTime: `${slot.hour}:${slot.minute}`,
-                endTime: availabilityPricingMode?.availabilityMode === 'OPENING_HOURS' ? 
-                  `${slot.hour}:${slot.minute}` : undefined
+                startTime: `${slot.hour}:${slot.minute}`
               };
+              
+              // Para OPENING_HOURS, incluir endTime si está disponible
+              if (availabilityPricingMode?.availabilityMode === 'OPENING_HOURS' && slot.endHour && slot.endMinute) {
+                scheduleItem.endTime = `${slot.endHour}:${slot.endMinute}`;
+              }
+              
+              return scheduleItem;
             });
           }),
           exceptions: formData.exceptions
@@ -929,7 +1076,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     const newTimeSlot = {
       id: Date.now().toString(),
       hour: '08',
-      minute: '00'
+      minute: '00',
+      // Para OPENING_HOURS, agregar campos de hora de fin
+      ...(availabilityPricingMode?.availabilityMode === 'OPENING_HOURS' && {
+        endHour: '17',
+        endMinute: '00'
+      })
     };
     
     setFormData(prev => ({
@@ -951,7 +1103,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     }));
   };
 
-  const handleTimeSlotChange = (day: string, timeSlotId: string, field: 'hour' | 'minute', value: string) => {
+  const handleTimeSlotChange = (day: string, timeSlotId: string, field: 'hour' | 'minute' | 'endHour' | 'endMinute', value: string) => {
     setFormData(prev => ({
       ...prev,
       timeSlots: {
@@ -1102,12 +1254,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                   {currentStep === 1 ? (
                     // Paso 1: Horario - Contenido completo
                     <div>
-                      {/* Indicador de carga para el modo de disponibilidad */}
-                      {isLoadingMode && (
+                      {/* Indicadores de carga */}
+                      {(isLoadingMode || isLoadingBookingOption) && (
                         <div className="mb-4">
-                        <div className="text-info">
+                          <div className="text-info">
                             <i className="fas fa-spinner fa-spin me-2"></i>
-                            Cargando configuración de horarios...
+                            {isLoadingBookingOption ? 'Cargando datos de la opción de reserva...' : 'Cargando configuración de horarios...'}
                           </div>
                         </div>
                       )}
@@ -1129,6 +1281,36 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                     ? 'Por persona' 
                                     : 'Por grupo'
                                 }
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Información de datos cargados */}
+                      {!isLoadingBookingOption && bookingOptionData && (
+                        <div className="mb-4">
+                          <div className="text-info">
+                            <i className="fas fa-download me-2"></i>
+                            <strong>Datos cargados:</strong> Se han precargado los datos existentes de la opción de reserva
+                            {formData.scheduleName && (
+                              <span className="ms-2">
+                                • <strong>Nombre:</strong> {formData.scheduleName}
+                              </span>
+                            )}
+                            {formData.startDate && (
+                              <span className="ms-2">
+                                • <strong>Inicio:</strong> {formData.startDate}
+                              </span>
+                            )}
+                            {formData.hasEndDate && formData.endDate && (
+                              <span className="ms-2">
+                                • <strong>Fin:</strong> {formData.endDate}
+                              </span>
+                            )}
+                            {formData.exceptions && formData.exceptions.length > 0 && (
+                              <span className="ms-2">
+                                • <strong>Excepciones:</strong> {formData.exceptions.length} fecha(s) configurada(s)
                               </span>
                             )}
                           </div>
@@ -1384,8 +1566,11 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                         <div className="mb-4">
                           <div className="mb-3">
                             <h5 className="fw-bold mb-0">
-                              Horario semanal estándar
+                              Horario de apertura semanal
                             </h5>
+                            <p className="text-muted small">
+                              Configura los rangos de horarios de apertura para cada día. Puedes agregar múltiples rangos por día, pero no pueden ser iguales.
+                            </p>
                           </div>
 
                           <div className="row">
@@ -1395,14 +1580,27 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                   <span className="fw-semibold me-3" style={{ minWidth: '100px' }}>
                                     {getTranslation(`stepSchedule.weeklySchedule.${day}`, language)}
                                   </span>
+                                  <button 
+                                    type="button" 
+                                    className="btn btn-link text-primary p-0"
+                                    onClick={() => handleAddTimeSlot(day)}
+                                  >
+                                    <i className="fas fa-plus me-1"></i>
+                                    Añadir rango de horario
+                                  </button>
                                 </div>
                                 
-                                {/* Mostrar franja horaria existente si existe */}
-                                {(formData.timeSlots[day] || []).length > 0 ? (
-                                  (formData.timeSlots[day] || []).map((timeSlot, index) => (
-                                    <div key={timeSlot.id} className="d-flex align-items-center mb-2 ms-4">
+                                {/* Mostrar franjas horarias existentes */}
+                                {(formData.timeSlots[day] || []).map((timeSlot, index) => {
+                                  const startTime = `${timeSlot.hour}:${timeSlot.minute}`;
+                                  const endTime = timeSlot.endHour && timeSlot.endMinute ? `${timeSlot.endHour}:${timeSlot.endMinute}` : '';
+                                  const isTimeRangeValid = endTime && startTime !== endTime;
+                                  
+                                  return (
+                                    <div key={timeSlot.id} className="d-flex align-items-center mb-2 ms-4 p-2 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
                                       {/* Campos de hora de inicio */}
                                       <div className="d-flex align-items-center me-2">
+                                        <label className="form-label me-1 mb-0 small">Inicio:</label>
                                         <select
                                           className="form-select me-1"
                                           style={{ width: '70px' }}
@@ -1435,11 +1633,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                       
                                       {/* Campos de hora de fin */}
                                       <div className="d-flex align-items-center me-3">
+                                        <label className="form-label me-1 mb-0 small">Fin:</label>
                                         <select
                                           className="form-select me-1"
                                           style={{ width: '70px' }}
-                                          value={timeSlot.hour}
-                                          onChange={(e) => handleTimeSlotChange(day, timeSlot.id, 'hour', e.target.value)}
+                                          value={timeSlot.endHour || '17'}
+                                          onChange={(e) => handleTimeSlotChange(day, timeSlot.id, 'endHour', e.target.value)}
                                         >
                                           {Array.from({ length: 24 }, (_, i) => (
                                             <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1451,8 +1650,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                         <select
                                           className="form-select me-2"
                                           style={{ width: '70px' }}
-                                          value={timeSlot.minute}
-                                          onChange={(e) => handleTimeSlotChange(day, timeSlot.id, 'minute', e.target.value)}
+                                          value={timeSlot.endMinute || '00'}
+                                          onChange={(e) => handleTimeSlotChange(day, timeSlot.id, 'endMinute', e.target.value)}
                                         >
                                           {Array.from({ length: 60 }, (_, i) => (
                                             <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1462,40 +1661,32 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                         </select>
                                       </div>
                                       
+                                      {/* Validación visual */}
+                                      {!isTimeRangeValid && endTime && (
+                                        <div className="text-danger small me-2">
+                                          <i className="fas fa-exclamation-triangle me-1"></i>
+                                          Los horarios no pueden ser iguales
+                                        </div>
+                                      )}
+                                      
                                       {/* Botón eliminar */}
                                       <button
                                         type="button"
                                         className="btn btn-outline-danger btn-sm me-2"
                                         onClick={() => handleRemoveTimeSlot(day, timeSlot.id)}
-                                        title="Eliminar horario"
+                                        title="Eliminar rango de horario"
                                       >
                                         <i className="fas fa-times"></i>
                                       </button>
-                                      
-                                      {/* Botón añadir horario de apertura */}
-                                      <button
-                                        type="button"
-                                        className="btn btn-link text-primary p-0"
-                                        onClick={() => handleAddTimeSlot(day)}
-                                        title="Añadir horario de apertura"
-                                      >
-                                        <i className="fas fa-plus me-1"></i>
-                                        Añadir horario de apertura
-                                      </button>
                                     </div>
-                                  ))
-                                ) : (
-                                  /* Si no hay franjas, mostrar solo el botón para añadir */
-                                  <div className="ms-4">
-                                    <button
-                                      type="button"
-                                      className="btn btn-link text-primary p-0"
-                                      onClick={() => handleAddTimeSlot(day)}
-                                      title="Añadir horario de apertura"
-                                    >
-                                      <i className="fas fa-plus me-1"></i>
-                                      Añadir horario de apertura
-                                    </button>
+                                  );
+                                })}
+                                
+                                {/* Mostrar mensaje si no hay rangos */}
+                                {(formData.timeSlots[day] || []).length === 0 && (
+                                  <div className="ms-4 text-muted small">
+                                    <i className="fas fa-info-circle me-1"></i>
+                                    No hay rangos de horario configurados para este día
                                   </div>
                                 )}
                               </div>
@@ -1503,21 +1694,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                           </div>
                         </div>
                       )}
-
-                                             {/* Información sobre el guardado */}
-                       <div className="mb-4">
-                         <div className="text-info border-0 bg-light">
-                           <div className="d-flex align-items-start">
-                             <i className="fas fa-info-circle text-primary me-2 mt-1"></i>
-                             <div>
-                               <p className="mb-0 text-muted">
-                                 Al hacer clic en "Guardar y continuar", se guardará la configuración de horarios y tiempo de salida, y se avanzará al siguiente paso.
-                               </p>
-                             </div>
-                           </div>
-                         </div>
-                       </div>
-
                        {/* Excepciones */}
                        <div className="mb-4">
                         <h5 className="fw-bold mb-3">
