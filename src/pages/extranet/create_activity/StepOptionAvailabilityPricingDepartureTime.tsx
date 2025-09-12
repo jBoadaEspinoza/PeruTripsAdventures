@@ -426,6 +426,21 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
             maxParticipants: response.data.groupMaxSize || response.data.groupMinSize
           }));
         }
+
+        // Cargar priceTiers existentes si pricingMode es PER_PERSON
+        if (response.data.priceTiers && response.data.priceTiers.length > 0 && currentStep === 4) {
+          const existingPriceTiers = response.data.priceTiers.map((tier: any, index: number) => ({
+            id: tier.id?.toString() || Date.now().toString() + index,
+            minPeople: tier.minParticipants || 1,
+            maxPeople: tier.maxParticipants || -1,
+            clientPays: tier.totalPrice?.toString() || '',
+            pricePerPerson: tier.pricePerParticipant?.toString() || ''
+          }));
+          
+          if (existingPriceTiers.length > 0) {
+            setPricingLevels(existingPriceTiers);
+          }
+        }
       } else {
         console.error('Error al obtener datos de la opción de reserva:', response.message);
       }
@@ -470,10 +485,11 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
   // Funciones para manejar niveles de precios (step 4)
   const handleAddPricingLevel = () => {
-    if (!apiCapacity) return;
+    const capacity = apiCapacity || getCapacityFromBookingOption();
+    if (!capacity) return;
     
-    // Si groupMaxSize es null (ilimitado), comportamiento especial
-    if (apiCapacity.groupMaxSize === null) {
+    // Si groupMaxSize es null (ilimitado), comportamiento especial - se pueden agregar todos los rangos que se requieran
+    if (capacity.groupMaxSize === null) {
       setPricingLevels(prev => {
         const updatedLevels = [...prev];
         
@@ -481,33 +497,69 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         const currentLevel = updatedLevels[updatedLevels.length - 1];
         if (currentLevel.maxPeople === -1) {
           // La fila actual era "Ilimitado", ahora le damos un valor específico
-          currentLevel.maxPeople = currentLevel.minPeople; // Valor inicial igual al mínimo
+          // Calcular el rango de 10 en 10 desde el mínimo actual
+          const rangeSize = 10;
+          currentLevel.maxPeople = currentLevel.minPeople + rangeSize - 1;
         }
         
-        // Calcular el nuevo rango mínimo para la nueva fila
+        // Calcular el nuevo rango mínimo para la nueva fila (de 10 en 10)
+        const rangeSize = 10;
         const newMinPeople = currentLevel.maxPeople + 1;
         
-        // Añadir el nuevo nivel que será "Ilimitado"
+        // Validar que el nuevo mínimo esté dentro del rango válido
+        if (newMinPeople < capacity.groupMinSize) {
+          alert(`No se puede agregar más rangos. El mínimo debe ser al menos ${capacity.groupMinSize} participantes (según la configuración de la opción de reserva).`);
+          return prev;
+        }
+        
+        // Calcular el nuevo rango máximo (de 10 en 10, pero editable)
+        const newMaxPeople = newMinPeople + rangeSize - 1;
+        
+        // Añadir el nuevo nivel con rango de 10 en 10 (editable)
         const newLevel = {
           id: Date.now().toString(),
           minPeople: newMinPeople,
-          maxPeople: -1, // -1 para indicar "Ilimitado"
+          maxPeople: newMaxPeople, // Rango de 10 en 10, pero editable
           clientPays: '',
           pricePerPerson: ''
         };
         
+        // Actualizar la fila anterior para que no sea "Ilimitado" si no es la última
         return [...updatedLevels, newLevel];
       });
     } else {
-      // Si hay límite específico, comportamiento normal
+      // Si hay límite específico, verificar si ya se cubre todo el rango
       const lastLevel = pricingLevels[pricingLevels.length - 1];
       const newMinPeople = lastLevel.maxPeople + 1;
-      const newMaxPeople = Math.min(apiCapacity.groupMaxSize, newMinPeople + 9);
+      
+      // Verificar si ya se cubre todo el rango desde groupMinSize hasta groupMaxSize
+      const allRangesCovered = pricingLevels.some(level => {
+        return level.minPeople <= capacity.groupMinSize && 
+               (level.maxPeople === -1 || level.maxPeople >= capacity.groupMaxSize);
+      });
+      
+      // Si ya se cubre todo el rango, no permitir agregar más rangos
+      if (allRangesCovered) {
+        alert(`No se puede agregar más rangos. Ya se cubre todo el rango desde ${capacity.groupMinSize} hasta ${capacity.groupMaxSize} participantes.`);
+        return;
+      }
+      
+      // Verificar que no exceda el límite máximo
+      if (newMinPeople > capacity.groupMaxSize) {
+        alert(`No se puede agregar más rangos. El límite máximo es ${capacity.groupMaxSize} participantes (según la configuración de la opción de reserva).`);
+        return;
+      }
+      
+      // Validar que el nuevo mínimo esté dentro del rango válido
+      if (newMinPeople < capacity.groupMinSize) {
+        alert(`No se puede agregar más rangos. El mínimo debe ser al menos ${capacity.groupMinSize} participantes (según la configuración de la opción de reserva).`);
+        return;
+      }
       
       const newLevel = {
         id: Date.now().toString(),
         minPeople: newMinPeople,
-        maxPeople: newMaxPeople,
+        maxPeople: capacity.groupMaxSize || newMinPeople + 9, // Por defecto usar groupMaxSize si está disponible
         clientPays: '',
         pricePerPerson: ''
       };
@@ -528,10 +580,45 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
   };
 
   const handlePricingLevelChange = (levelId: string, field: 'minPeople' | 'maxPeople' | 'clientPays', value: string | number) => {
+    const capacity = apiCapacity || getCapacityFromBookingOption();
+    
     setPricingLevels(prev => {
       const updatedLevels = prev.map(level => 
         level.id === levelId ? { ...level, [field]: value } : level
       );
+      
+      // Validar que los valores estén dentro del rango permitido
+      if (field === 'minPeople' || field === 'maxPeople') {
+        const level = updatedLevels.find(l => l.id === levelId);
+        if (level && capacity) {
+          // Validar que minPeople no sea menor que groupMinSize
+          if (field === 'minPeople' && level.minPeople < capacity.groupMinSize) {
+            level.minPeople = capacity.groupMinSize;
+            alert(`El mínimo de participantes debe ser al menos ${capacity.groupMinSize} (según la configuración de la opción de reserva)`);
+          }
+          
+          // Validar que maxPeople no exceda groupMaxSize (si no es ilimitado)
+          if (field === 'maxPeople' && capacity.groupMaxSize && level.maxPeople > capacity.groupMaxSize) {
+            level.maxPeople = capacity.groupMaxSize;
+            alert(`El máximo de participantes no puede exceder ${capacity.groupMaxSize} (según la configuración de la opción de reserva)`);
+          }
+          
+          // Validar que minPeople no sea mayor que maxPeople
+          if (level.minPeople > level.maxPeople && level.maxPeople !== -1) {
+            level.maxPeople = level.minPeople;
+          }
+          
+          // Validar que minPeople esté dentro del rango válido
+          if (field === 'minPeople' && level.minPeople < capacity.groupMinSize) {
+            level.minPeople = capacity.groupMinSize;
+          }
+          
+          // Validar que maxPeople esté dentro del rango válido (si no es ilimitado)
+          if (field === 'maxPeople' && capacity.groupMaxSize && level.maxPeople > capacity.groupMaxSize && level.maxPeople !== -1) {
+            level.maxPeople = capacity.groupMaxSize;
+          }
+        }
+      }
       
       // Si se cambió el precio que paga el cliente, calcular el precio por participante
       if (field === 'clientPays') {
@@ -586,14 +673,17 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
 
   // Función para conectar automáticamente los rangos de precios
   const connectPricingRanges = (levels: typeof pricingLevels): typeof pricingLevels => {
+    const capacity = apiCapacity || getCapacityFromBookingOption();
+    if (!capacity) return levels;
+    
     const sortedLevels = [...levels].sort((a, b) => a.minPeople - b.minPeople);
     
     for (let i = 0; i < sortedLevels.length; i++) {
       const currentLevel = sortedLevels[i];
       
       if (i === 0) {
-        // El primer nivel siempre empieza en 1
-        currentLevel.minPeople = 1;
+        // El primer nivel siempre empieza en el groupMinSize
+        currentLevel.minPeople = capacity.groupMinSize;
       } else {
         // Los siguientes niveles empiezan donde terminó el anterior
         const previousLevel = sortedLevels[i - 1];
@@ -605,30 +695,36 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           currentLevel.minPeople = previousLevel.minPeople + 1;
         }
       }
+      
+      // Validar que el mínimo no sea menor que groupMinSize
+      if (currentLevel.minPeople < capacity.groupMinSize) {
+        currentLevel.minPeople = capacity.groupMinSize;
+      }
+      
+      // Validar que el máximo no exceda groupMaxSize (si no es ilimitado)
+      if (currentLevel.maxPeople !== -1 && capacity.groupMaxSize && currentLevel.maxPeople > capacity.groupMaxSize) {
+        currentLevel.maxPeople = capacity.groupMaxSize;
+      }
     }
     
-    // Si groupMaxSize es null, solo la ÚLTIMA fila debe ser "ilimitado"
-    if (apiCapacity?.groupMaxSize === null && sortedLevels.length > 0) {
-      // Solo la ÚLTIMA fila debe ser "ilimitado"
-      const lastIndex = sortedLevels.length - 1;
-      sortedLevels[lastIndex] = {
-        ...sortedLevels[lastIndex],
-        maxPeople: -1 // Marcar como "ilimitado"
-      };
-      
-      // Las demás filas deben tener rangos editables
-      for (let i = 0; i < lastIndex; i++) {
+    // Si groupMaxSize es null, mantener rangos de 10 en 10 editables (no automáticamente "ilimitado")
+    if (capacity.groupMaxSize === null && sortedLevels.length > 0) {
+      // Todas las filas deben tener rangos editables de 10 en 10
+      for (let i = 0; i < sortedLevels.length; i++) {
         if (sortedLevels[i].maxPeople === -1) {
-          // Si alguna fila intermedia es "ilimitado", darle un rango editable
-          const nextLevel = sortedLevels[i + 1];
-          const newMaxPeople = nextLevel.minPeople - 1;
+          // Si alguna fila es "ilimitado", darle un rango editable de 10 en 10
+          const rangeSize = 10;
           sortedLevels[i] = {
             ...sortedLevels[i],
-            maxPeople: newMaxPeople
+            maxPeople: sortedLevels[i].minPeople + rangeSize - 1
           };
         } else if (sortedLevels[i].maxPeople === sortedLevels[i].minPeople) {
-          // Si el valor inicial es igual al mínimo, mantenerlo así
-          // Esto asegura que las filas nuevas mantengan su valor inicial
+          // Si el valor inicial es igual al mínimo, darle un rango de 10 en 10
+          const rangeSize = 10;
+          sortedLevels[i] = {
+            ...sortedLevels[i],
+            maxPeople: sortedLevels[i].minPeople + rangeSize - 1
+          };
         }
       }
     }
@@ -679,21 +775,42 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     }
   }, [currentStep, optionId, availabilityPricingMode?.pricingMode]);
 
-  // Inicializar niveles de precios cuando se cargue la capacidad de la API
+  // Inicializar niveles de precios cuando se cargue la capacidad
   useEffect(() => {
-    if (apiCapacity && pricingLevels.length === 1) {
-      // Actualizar el primer nivel con los valores de la API
+    const capacity = apiCapacity || getCapacityFromBookingOption();
+    
+    if (capacity && pricingLevels.length === 1) {
+      // Actualizar el primer nivel con los valores de capacidad
       setPricingLevels(prev => {
         const updatedLevels = [...prev];
         updatedLevels[0] = {
           ...updatedLevels[0],
-          minPeople: apiCapacity.groupMinSize,
-          maxPeople: apiCapacity.groupMaxSize === null ? -1 : apiCapacity.groupMinSize // -1 para "ilimitado"
+          minPeople: capacity.groupMinSize,
+          maxPeople: capacity.groupMaxSize === null ? 
+            capacity.groupMinSize + 9 : // Rango de 10 en 10 cuando es ilimitado
+            capacity.groupMaxSize // Usar groupMaxSize cuando tiene límite
         };
         return updatedLevels;
       });
     }
-  }, [apiCapacity]);
+  }, [apiCapacity, bookingOptionData]);
+
+  // Cargar priceTiers existentes cuando se entre al paso 4 con pricingMode PER_PERSON
+  useEffect(() => {
+    if (currentStep === 4 && availabilityPricingMode?.pricingMode === 'PER_PERSON' && bookingOptionData?.priceTiers) {
+      const existingPriceTiers = bookingOptionData.priceTiers.map((tier: any, index: number) => ({
+        id: tier.id?.toString() || Date.now().toString() + index,
+        minPeople: tier.minParticipants || 1,
+        maxPeople: tier.maxParticipants || -1,
+        clientPays: tier.totalPrice?.toString() || '',
+        pricePerPerson: tier.pricePerParticipant?.toString() || ''
+      }));
+      
+      if (existingPriceTiers.length > 0) {
+        setPricingLevels(existingPriceTiers);
+      }
+    }
+  }, [currentStep, availabilityPricingMode?.pricingMode, bookingOptionData]);
 
   // Función para obtener la capacidad de la API
   const fetchAvailabilityPricingCapacity = async () => {
@@ -714,6 +831,17 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       console.error('Error al obtener capacidad:', error);
       setApiCapacity(null);
     }
+  };
+
+  // Función para obtener la capacidad desde los datos de la opción de reserva
+  const getCapacityFromBookingOption = () => {
+    if (bookingOptionData) {
+      return {
+        groupMinSize: bookingOptionData.groupMinSize || 1,
+        groupMaxSize: bookingOptionData.groupMaxSize
+      };
+    }
+    return null;
   };
 
   // Guardar datos en localStorage cuando cambien
@@ -972,6 +1100,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     // Si estamos en el step 4 y pricingMode = PER_PERSON
     if (currentStep === 4 && availabilityPricingMode?.pricingMode === 'PER_PERSON') {
       try {
+        const capacity = apiCapacity || getCapacityFromBookingOption();
+        
         // Validar que haya al menos un nivel de precios configurado
         if (pricingLevels.length === 0) {
           alert('Error: Debe configurar al menos un nivel de precios');
@@ -983,6 +1113,26 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         if (invalidLevels.length > 0) {
           alert('Error: Todos los niveles de precios deben tener un precio configurado');
           return;
+        }
+
+        // Validar que todos los rangos estén dentro de los límites de la opción de reserva
+        if (capacity) {
+          const invalidRanges = pricingLevels.filter(level => {
+            // Validar que el mínimo no sea menor que groupMinSize
+            if (level.minPeople < capacity.groupMinSize) {
+              return true;
+            }
+            // Validar que el máximo no exceda groupMaxSize (si no es ilimitado)
+            if (level.maxPeople !== -1 && capacity.groupMaxSize && level.maxPeople > capacity.groupMaxSize) {
+              return true;
+            }
+            return false;
+          });
+          
+          if (invalidRanges.length > 0) {
+            alert(`Error: Los rangos de precios deben estar entre ${capacity.groupMinSize} y ${capacity.groupMaxSize || 'ilimitado'} participantes (según la configuración de la opción de reserva)`);
+            return;
+          }
         }
 
         // Activar estado de carga
@@ -1961,7 +2111,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                         </h6>
                       
                         <div className="row">
-                          <div className="col-md-6 mb-4">
+                          <div className="col-md-2 mb-4">
                             <label htmlFor="minParticipants" className="form-label fw-bold">
                               Número mínimo de participantes
                             </label>
@@ -2005,16 +2155,19 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                          </h6>
                          
                            {/* Rango total de personas */}
-                           {availabilityPricingMode?.pricingMode === 'PER_PERSON' && apiCapacity && (
-                             <div className="mb-3">
-                             <div className="d-flex align-items-center">
-                                 <span className="text-muted me-2">
-                                   Rango de personas: {apiCapacity.groupMinSize} a {apiCapacity.groupMaxSize || 'Ilimitado'}
-                                 </span>
-                               <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
-                             </div>
-                           </div>
-                           )}
+                           {availabilityPricingMode?.pricingMode === 'PER_PERSON' && (() => {
+                             const capacity = apiCapacity || getCapacityFromBookingOption();
+                             return capacity && (
+                               <div className="mb-3">
+                                 <div className="d-flex align-items-center">
+                                   <span className="text-muted me-2">
+                                     Rango de personas: {capacity.groupMinSize} a {capacity.groupMaxSize || 'Ilimitado'}
+                                   </span>
+                                   <i className="fas fa-info-circle text-muted" style={{ fontSize: '14px' }}></i>
+                                 </div>
+                               </div>
+                             );
+                           })()}
                            
                            {/* Headers de la tabla */}
                            <div className="row mb-3">
@@ -2055,14 +2208,17 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                      {level.maxPeople === -1 ? (
                                        <span className="text-primary fw-bold">Ilimitado</span>
                                      ) : (
-                                       <input
-                                         type="number"
-                                         className="form-control form-control-sm d-inline-block"
-                                         style={{ width: '60px' }}
-                                         value={level.maxPeople}
-                                         onChange={(e) => handlePricingLevelChange(level.id, 'maxPeople', parseInt(e.target.value) || 1)}
+                                         <input
+                                           type="number"
+                                           className="form-control form-control-sm d-inline-block"
+                                           style={{ width: '60px' }}
+                                           value={level.maxPeople}
+                                           onChange={(e) => handlePricingLevelChange(level.id, 'maxPeople', parseInt(e.target.value) || 1)}
                                          min={level.minPeople + 1}
-                                         max={apiCapacity?.groupMaxSize || 999}
+                                         max={(() => {
+                                           const capacity = apiCapacity || getCapacityFromBookingOption();
+                                           return capacity?.groupMaxSize || 999;
+                                         })()}
                                        />
                                      )}
                                    </span>
