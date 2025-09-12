@@ -571,10 +571,27 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
   const handleRemovePricingLevel = (levelId: string) => {
     if (pricingLevels.length > 1) {
       setPricingLevels(prev => {
+        const capacity = apiCapacity || getCapacityFromBookingOption();
         const filteredLevels = prev.filter(level => level.id !== levelId);
         
         // Reconectar rangos después de eliminar
-        return connectPricingRanges(filteredLevels);
+        const connectedLevels = connectPricingRanges(filteredLevels);
+        
+        // Actualizar el último rango para que tenga el límite máximo
+        if (connectedLevels.length > 0 && capacity) {
+          const lastIndex = connectedLevels.length - 1;
+          const lastLevel = connectedLevels[lastIndex];
+          
+          // Si groupMaxSize es null (ilimitado), el último rango debe ser "Ilimitado"
+          if (capacity.groupMaxSize === null) {
+            lastLevel.maxPeople = -1; // -1 para indicar "Ilimitado"
+          } else {
+            // Si groupMaxSize tiene un valor específico, el último rango debe llegar hasta ese valor
+            lastLevel.maxPeople = capacity.groupMaxSize;
+          }
+        }
+        
+        return connectedLevels;
       });
     }
   };
@@ -707,9 +724,9 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       }
     }
     
-    // Si groupMaxSize es null, mantener rangos de 10 en 10 editables (no automáticamente "ilimitado")
+    // Si groupMaxSize es null, mantener rangos de 10 en 10 editables, excepto el último que puede ser "ilimitado"
     if (capacity.groupMaxSize === null && sortedLevels.length > 0) {
-      // Todas las filas deben tener rangos editables de 10 en 10
+      // Todas las filas deben tener rangos editables de 10 en 10, excepto la última que puede ser "ilimitado"
       for (let i = 0; i < sortedLevels.length; i++) {
         if (sortedLevels[i].maxPeople === -1) {
           // Si alguna fila es "ilimitado", darle un rango editable de 10 en 10
@@ -726,6 +743,15 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
             maxPeople: sortedLevels[i].minPeople + rangeSize - 1
           };
         }
+      }
+      
+      // Solo la última fila puede ser "ilimitado" cuando groupMaxSize es null
+      const lastIndex = sortedLevels.length - 1;
+      if (lastIndex >= 0) {
+        sortedLevels[lastIndex] = {
+          ...sortedLevels[lastIndex],
+          maxPeople: -1 // Marcar como "ilimitado"
+        };
       }
     }
     
@@ -1161,7 +1187,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           alert('¡Configuración de precios guardada exitosamente! Redirigiendo...');
 
           // Redirigir a la página principal de availabilityPricing
-          navigate(`/extranet/activity/availabilityPricing?optionId=${optionId}&lang=${lang}&currency=${currency}`);
+          navigate(`/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&currentStep=${currentStep}`);
           return;
         } else {
           console.error('StepOptionAvailabilityPricingDepartureTime: Error al guardar precios:', response.message);
@@ -1186,7 +1212,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
       return;
     } else {
       // If we're at the last step, go back to the main availability pricing page
-      navigate('/extranet/activity/availabilityPricing');
+      navigate(`/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&currentStep=9`);
     }
   };
 
