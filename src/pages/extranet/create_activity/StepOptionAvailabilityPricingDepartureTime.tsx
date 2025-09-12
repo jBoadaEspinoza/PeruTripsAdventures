@@ -94,9 +94,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
     { id: '4', name: 'Adulto mayor', minAge: 65, maxAge: 99 }
   ]);
 
-  // Estado para mostrar ajustes avanzados
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-
   // Estado para la capacidad (step 3)
   const [capacityData, setCapacityData] = useState({
     minParticipants: 1,
@@ -418,6 +415,15 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           setFormData(prev => ({
             ...prev,
             exceptions: loadedExceptions
+          }));
+        }
+        
+        // Cargar datos de capacidad desde la opción de reserva
+        if (response.data.groupMinSize !== undefined) {
+          setCapacityData(prev => ({
+            ...prev,
+            minParticipants: response.data.groupMinSize,
+            maxParticipants: response.data.groupMaxSize || response.data.groupMinSize
           }));
         }
       } else {
@@ -897,7 +903,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         localStorage.setItem(`${storageKey}_pricingType`, pricingType);
         
         // Navegar al step 3
-        navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?step=3&optionId=${optionId}`, {
+        navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&step=3`, {
           activityId,
           lang,
           currency,
@@ -942,7 +948,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
           alert('¡Configuración de capacidad guardada exitosamente! Redirigiendo al siguiente paso...');
           
           // Navegar al step 4
-          navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing/create?step=4&optionId=${optionId}`, {
+          navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing/create?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&step=4`, {
             activityId,
             lang,
             currency,
@@ -1715,21 +1721,9 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                      // Paso 2: Categorías de precios
                      <div>
                        <div className="d-flex justify-content-between align-items-center mb-4">
-                         <h5 className="fw-bold mb-0">
-                           Categorías de precios:
-                       </h5>
-                         <div className="d-flex align-items-center">
-                           <span className="me-2">Mostrar ajustes avanzados</span>
-                           <div className="form-check form-switch">
-                             <input
-                               className="form-check-input"
-                               type="checkbox"
-                               id="showAdvancedSettings"
-                               checked={showAdvancedSettings}
-                               onChange={(e) => setShowAdvancedSettings(e.target.checked)}
-                             />
-                           </div>
-                         </div>
+                          <h5 className="fw-bold mb-0">
+                              Categorías de precios:
+                          </h5>
                        </div>
                        
                        <div className="mb-4">
@@ -1907,12 +1901,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                    localStorage.setItem(`${storageKey}_pricingType`, pricingType);
                                    
                                    // Continuar al step 3
-                                   navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?step=3&optionId=${optionId}`, {
-          activityId,
-          lang,
-          currency,
-          currentStep
-        });
+                                   navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&step=3`, {
+                                      activityId,
+                                      lang,
+                                      currency,
+                                      currentStep
+                                    });
                                  }}
                                >
                                  <i className="fas fa-arrow-right me-2"></i>
@@ -1931,7 +1925,7 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                              className="btn btn-primary"
                              onClick={() => {
                                localStorage.setItem(`${storageKey}_pricingType`, pricingType);
-                               navigate(`/extranet/activity/availabilityPricing/create?step=3&optionId=${optionId}&lang=${lang}&currency=${currency}`);
+                               navigate(`/extranet/activity/availabilityPricing/create?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&step=3`);
                              }}
                            >
                              <i className="fas fa-arrow-right me-2"></i>
@@ -1965,11 +1959,10 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                         <h6 className="fw-bold mb-4 text-dark">
                           ¿Cuántos participantes puedes aceptar por franja horaria?
                         </h6>
-                        
+                      
                         <div className="row">
-                            <div className="d-flex flex-column">
-                              <div className="col-md-4 mb-4 d-flex justify-content-start">
-                            <label htmlFor="minParticipants" className="form-label text-muted d-flex align-items-center">
+                          <div className="col-md-6 mb-4">
+                            <label htmlFor="minParticipants" className="form-label fw-bold">
                               Número mínimo de participantes
                             </label>
                             <input
@@ -1977,9 +1970,12 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                               className="form-control"
                               id="minParticipants"
                               min="1"
-                              defaultValue="1"
+                              value={capacityData.minParticipants}
+                              onChange={(e) => setCapacityData(prev => ({
+                                ...prev,
+                                minParticipants: parseInt(e.target.value) || 1
+                              }))}
                             />
-                          </div>
                           </div>
                         </div>
                       </div>
