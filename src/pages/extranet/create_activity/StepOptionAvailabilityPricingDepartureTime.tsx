@@ -347,8 +347,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         
         // Si no hay schedules pero hay otros datos de la opción de reserva, 
         // intentar cargar información básica desde la opción de reserva
-        if (!scheduleData.scheduleName && response.data.title) {
-          scheduleData.scheduleName = response.data.title;
+        if (!scheduleData.scheduleName) {
+          scheduleData.scheduleName = "";
         }
         
         // Actualizar el estado con los datos básicos cargados
@@ -865,11 +865,8 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
         const response = await bookingOptionApi.createAvailabilityPricingDepartureTime(requestData);
         
         if (response.success) {
-          // Mostrar mensaje de éxito temporal
-          alert('¡Configuración de horarios y tiempo de salida guardada exitosamente! Redirigiendo al siguiente paso...');
-          
           // Recargar la página con step=2
-          window.location.href = `/extranet/activity/availabilityPricing/create?optionId=${optionId}&lang=${lang}&currency=${currency}&step=2`;
+          window.location.href = `/extranet/activity/availabilityPricing/create?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&step=2`;
           return;
         } else {
           console.error('StepOptionAvailabilityPricingDepartureTime: Error en la API:', response.message);
@@ -1281,36 +1278,6 @@ export default function StepOptionAvailabilityPricingDepartureTime() {
                                     ? 'Por persona' 
                                     : 'Por grupo'
                                 }
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Información de datos cargados */}
-                      {!isLoadingBookingOption && bookingOptionData && (
-                        <div className="mb-4">
-                          <div className="text-info">
-                            <i className="fas fa-download me-2"></i>
-                            <strong>Datos cargados:</strong> Se han precargado los datos existentes de la opción de reserva
-                            {formData.scheduleName && (
-                              <span className="ms-2">
-                                • <strong>Nombre:</strong> {formData.scheduleName}
-                              </span>
-                            )}
-                            {formData.startDate && (
-                              <span className="ms-2">
-                                • <strong>Inicio:</strong> {formData.startDate}
-                              </span>
-                            )}
-                            {formData.hasEndDate && formData.endDate && (
-                              <span className="ms-2">
-                                • <strong>Fin:</strong> {formData.endDate}
-                              </span>
-                            )}
-                            {formData.exceptions && formData.exceptions.length > 0 && (
-                              <span className="ms-2">
-                                • <strong>Excepciones:</strong> {formData.exceptions.length} fecha(s) configurada(s)
                               </span>
                             )}
                           </div>
