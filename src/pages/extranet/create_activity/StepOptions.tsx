@@ -8,7 +8,9 @@ import { useActivityParams } from '../../../hooks/useActivityParams';
 import { navigateToActivityStep } from '../../../utils/navigationUtils';
 import CreateOptionModal from '../../../components/CreateOptionModal';
 import { bookingOptionApi } from '../../../api/bookingOption';
+import { activitiesApi } from '../../../api/activities';
 import { useCurrency } from '../../../context/CurrencyContext';
+import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 
 interface BookingOption {
   id: string;
@@ -26,6 +28,7 @@ const StepOptions: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { currency } = useCurrency();
+  const { withLoading } = useExtranetLoading();
   const dispatch = useAppDispatch();
   const { activityId, lang, currency: urlCurrency, currentStep } = useActivityParams();
   const hasRedirected = useRef(false);
@@ -172,24 +175,40 @@ const StepOptions: React.FC = () => {
     });
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const activeOptions = options.filter(option => option.isActive);
     if (activeOptions.length === 0) {
-      // Se redirecciona a la pagina StepItinerary 
-      navigateToActivityStep(navigate, '/extranet/activity/createItinerary', {
-        activityId,
-        lang,
-        currency: urlCurrency,
-        currentStep
-      });
+      alert('No hay opciones activas para procesar');
       return;
     }
-    navigateToActivityStep(navigate, '/extranet/activity/createItinerary', {
-      activityId,
-      lang,
-      currency: urlCurrency,
-      currentStep
-    });
+    
+    // Si hay opciones activas, procesar cada una
+    if (!activityId) {
+      console.error('No se encontró activityId');
+      return;
+    }
+    await withLoading(async () => {
+      try {
+        for (const option of activeOptions) {
+          const response = await activitiesApi.createAddBookingOption({
+            id: activityId,
+            optionId: option.id
+          });
+          if (!response || !response.success) {
+            console.error('Error al agregar opción de reserva:', response?.message);
+          }
+        }
+        
+        navigateToActivityStep(navigate, '/extranet/activity/createItinerary', {
+          activityId,
+          lang,
+          currency: urlCurrency,
+          currentStep: 10
+        });
+      } catch (error) {
+        console.error('Error al procesar opciones de reserva:', error);
+      }
+    }, 'process-booking-options');
   };
 
   const handleBack = () => {

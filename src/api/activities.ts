@@ -80,7 +80,6 @@ export interface Activity {
   guidanceTypeIsActive: boolean;
   bookingOptions: BookingOption[];
   images: ActivityImage[];
-  itineraries?: any[]; // Campo opcional para itinerarios
   createAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -142,6 +141,11 @@ export interface CreateTitleRequest {
   id: string;
   title: string;
   lang: string;
+}
+
+export interface CreateBookingOptionRequest{
+  id : String 
+  optionId: string;
 }
 
 export interface CreateTitleResponse {
@@ -231,6 +235,11 @@ export interface CreateImagesResponse{
   message: string;
 }
 
+export interface CreateAddBookingOptionResponse{
+  success: boolean;
+  message: string;
+}
+
 export interface GetActivityByIdRequest {
   activityId: string;
   lang: string;
@@ -252,11 +261,9 @@ export const activitiesApi = {
         companyId: getRuc()
       };
       
-      console.log('ctivities API: Search params:', searchParams);
       const response = await apiGet<SearchResponse>('/activities/search', { params: searchParams });
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error fetching activities:', error);
       
       // Retornar una respuesta de error en lugar de lanzar la excepción
       return {
@@ -289,7 +296,6 @@ export const activitiesApi = {
         throw new Error('Invalid response structure');
       }
     } catch (error: any) {
-      console.error('Error fetching activity:', error);
       console.error('Error details:', {
         message: error.message,
         status: error.response?.status,
@@ -307,7 +313,6 @@ export const activitiesApi = {
       const response = await apiGet<DestinationsResponse>('/activities/destinations', { params });
       return response;
     } catch (error: any) {
-      console.error('Error fetching destinations:', error);
       console.error('Error details:', {
         message: error.message,
         status: error.response?.status,
@@ -329,9 +334,7 @@ export const activitiesApi = {
 
   createCategory: async (request: CreateCategoryRequest): Promise<CreateCategoryResponse> => {
     try {
-      console.log('Activities API: Creating category with request:', request);
       const response = await apiPost<CreateCategoryResponse>('/activities/createCategory', request);
-      console.log('Activities API: Raw response:', response);
       
       // Validar que la respuesta tenga la estructura esperada
       if (response && typeof response === 'object') {
@@ -381,8 +384,7 @@ export const activitiesApi = {
       
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error creating activity title:', error);
-      
+
       // Retornar una respuesta de error en lugar de lanzar la excepción
       return {
         success: false,
@@ -407,7 +409,6 @@ export const activitiesApi = {
       
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error creating activity description:', error);
       
       return {
         success: false,
@@ -432,7 +433,6 @@ export const activitiesApi = {
       
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error creating activity recommendations:', error);
       
       return {
         success: false,
@@ -457,7 +457,6 @@ export const activitiesApi = {
       
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error creating activity restrictions:', error);
       
       return {
         success: false,
@@ -501,7 +500,6 @@ export const activitiesApi = {
       }
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error creating activity not includes:', error);
       
       return {
         success: false,
@@ -526,7 +524,6 @@ export const activitiesApi = {
       
       return response;
     } catch (error: any) {
-      console.error('Activities API: Error getting activity by ID:', error);
       
       return {
         success: false,
@@ -549,10 +546,30 @@ export const activitiesApi = {
       return response;
     }
     catch(error: any){
-      console.error('Activities API: Error creating activity images:', error);
       return {
         success: false,
         message: 'Error al crear imagenes de la actividad'
+      };
+    }
+  },
+  createAddBookingOption: async (request: CreateBookingOptionRequest): Promise<CreateAddBookingOptionResponse> => {
+    try{
+      const response = await apiPost<CreateAddBookingOptionResponse>('/activities/updateBookingOptions', request);
+      if(response && typeof response === 'object'){
+        if('success' in response && 'message' in response){
+          return response as CreateAddBookingOptionResponse;
+        }
+        const responseAny = response as any;
+        if(responseAny && typeof responseAny === 'object' && 'data' in responseAny && responseAny.data){
+          return responseAny.data as CreateAddBookingOptionResponse;
+        }
+      }
+      return response;
+    }
+    catch(error: any){
+      return {
+        success: false,
+        message: 'Error al crear opcion de reserva de la actividad'
       };
     }
   },
@@ -577,8 +594,6 @@ export const activitiesApi = {
       return response;
     }
     catch(error: any){
-      console.error('Activities API: Error getting current step:', error);
-      
       // Retornar una respuesta de error en lugar de lanzar la excepción
       return {
         success: false,

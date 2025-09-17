@@ -46,9 +46,56 @@ export interface BookingOption {
     schedules: Schedule[];
     scheduleExceptions: ScheduleException[];
     priceTiers: PriceTier[];
+    itineraries: Itinerary[];
   }
   
-  export interface PickupPoint {
+  export interface Itinerary {
+    id?: number;
+    title?: string;
+    description?: string;
+    startLatitude?: number;
+    startLongitude?: number;
+    endLatitude?: number;
+    endLongitude?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    isActive?: boolean;
+    itinerarySteps?: ItineraryStep[];
+}
+
+export interface ItineraryStep {
+    id?: number;
+    orderIndex?: number;
+    dayNumber?: number;
+    title?: string;
+    description?: string;
+    stepType?: string;
+    durationDays?: number;
+    durationHours?: number;
+    durationMinutes?: number;
+    place?: City;
+    latitude?: number;
+    longitude?: number;
+    transportMode?: TransportMode;
+    subactivityTag?: SubactivityTag;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface TransportMode {
+    id: number;
+    name: string;
+    description: string;
+    isActive: boolean;
+}
+
+export interface SubactivityTag {
+    id: number;
+    name: string;
+    isActive: boolean;
+}
+
+export interface PickupPoint {
     id: number;
     city: City;
     name: string;
@@ -56,9 +103,9 @@ export interface BookingOption {
     latitude: number;
     longitude: number;
     notes: string | null;
-  }
-  
-  export interface City {
+}
+
+export interface City {
     id: number;
     cityName: string;
     cityLatitude: number | null;
@@ -66,9 +113,9 @@ export interface BookingOption {
     countryId: string;
     imageUrl: string;
     isActive: boolean | null;
-  }
-  
-  export interface Schedule {
+}
+
+export interface Schedule {
     id: number;
     title: string;
     dayOfWeek: number;
@@ -77,9 +124,9 @@ export interface BookingOption {
     startTime: string;
     endTime: string | null;
     isActive: boolean;
-  }
-  
-  export interface PriceTier {
+}
+
+export interface PriceTier {
     id: number;
     minParticipants: number;
     maxParticipants: number | null;
@@ -87,7 +134,7 @@ export interface BookingOption {
     pricePerParticipant: number;
     commissionPercent: number;
     currency: string;
-  }
+}
 
 export interface CutOffTimeRequest{
     timeSlot: string;

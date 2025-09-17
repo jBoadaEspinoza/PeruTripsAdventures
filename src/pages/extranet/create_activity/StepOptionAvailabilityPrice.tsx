@@ -213,7 +213,7 @@ export default function StepOptionAvailabilityPrice() {
   };
 
   const handleContinue = () => {
-    console.log('StepOptionAvailabilityPrice: Continuando con datos:', formData);
+    //Consume api/activities/createAddBookingOption
     // navega a la página de configuración de corte
     const currency = 'PEN'; // Por defecto, se puede obtener del contexto si está disponible
     navigateToActivityStep(navigate, `/extranet/activity/cutOff?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}&currentStep=9`, {
@@ -541,15 +541,55 @@ export default function StepOptionAvailabilityPrice() {
                           <div className="mb-2">
                             <span className="fw-bold" style={{ color: '#2d3748' }}>Rango de fechas:</span>
                             <span className="ms-2" style={{ color: '#4a5568' }}>
-                              {bookingOptionData.schedules[0]?.startDate ? new Date(bookingOptionData.schedules[0].startDate).toLocaleDateString('es-ES', { 
-                                day: '2-digit', 
-                                month: 'short', 
-                                year: 'numeric' 
-                              }) : '27 jul 2025'} - {bookingOptionData.schedules[0]?.endDate ? new Date(bookingOptionData.schedules[0].endDate).toLocaleDateString('es-ES', { 
-                                day: '2-digit', 
-                                month: 'short', 
-                                year: 'numeric' 
-                              }) : 'Sin fecha de fin'}
+                              {(() => {
+                                if (!bookingOptionData.schedules || bookingOptionData.schedules.length === 0) {
+                                  return 'Sin fechas configuradas';
+                                }
+
+                                // Función para formatear fecha en Lima/Peru
+                                const formatDateInLima = (dateString: string) => {
+                                  const date = new Date(dateString);
+                                  return date.toLocaleDateString('es-PE', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    timeZone: 'America/Lima'
+                                  });
+                                };
+
+                                if (bookingOptionData.schedules.length === 1) {
+                                  // Un solo schedule
+                                  const schedule = bookingOptionData.schedules[0];
+                                  const startDate = schedule.seasonStartDate ? formatDateInLima(schedule.seasonStartDate) : '27 jul 2025';
+                                  const endDate = schedule.seasonEndDate ? formatDateInLima(schedule.seasonEndDate) : 'Sin fecha de fin';
+                                  return `${startDate} - ${endDate}`;
+                                } else {
+                                  // Múltiples schedules - encontrar el rango completo
+                                  const allStartDates = bookingOptionData.schedules
+                                    .map((s: any) => s.seasonStartDate)
+                                    .filter((date: any) => date)
+                                    .map((date: any) => new Date(date!));
+                                  
+                                  const allEndDates = bookingOptionData.schedules
+                                    .map((s: any) => s.seasonEndDate)
+                                    .filter((date: any) => date)
+                                    .map((date: any) => new Date(date!));
+
+                                  if (allStartDates.length === 0) {
+                                    return 'Sin fechas de inicio configuradas';
+                                  }
+
+                                  const earliestStart = new Date(Math.min(...allStartDates.map((d: Date) => d.getTime())));
+                                  const latestEnd = allEndDates.length > 0 ? 
+                                    new Date(Math.max(...allEndDates.map((d: Date) => d.getTime()))) : 
+                                    null;
+
+                                  const startFormatted = formatDateInLima(earliestStart.toISOString());
+                                  const endFormatted = latestEnd ? formatDateInLima(latestEnd.toISOString()) : 'Sin fecha de fin';
+                                  
+                                  return `${startFormatted} - ${endFormatted}`;
+                                }
+                              })()}
                             </span>
                           </div>
                         </div>
@@ -557,29 +597,45 @@ export default function StepOptionAvailabilityPrice() {
                           <div className="mb-2">
                             <span className="fw-bold" style={{ color: '#2d3748' }}>Participantes:</span>
                             <span className="ms-2" style={{ color: '#4a5568' }}>
-                              {bookingOptionData.groupMinSize || 1} - {bookingOptionData.groupMaxSize || 40}
+                              {bookingOptionData.groupMinSize || 1} - {bookingOptionData.groupMaxSize || 'Ilimitado'}
                             </span>
                           </div>
                         </div>
                         <div className="col-md-4">
                           <div className="mb-2">
-                            <span className="fw-bold" style={{ color: '#2d3748' }}>Precios:</span>
+                            <span className="fw-bold" style={{ color: '#2d3748' }}>
+                              {(() => {
+                                if (bookingOptionData.pricingMode === 'PER_PERSON') {
+                                  return 'Precio por persona:';
+                                } else {
+                                  return 'Precios por grupo:';
+                                }
+                              })()}
+                                
+                            </span>
                             <span className="ms-2" style={{ color: '#4a5568' }}>
                               {(() => {
                                 if (bookingOptionData.pricingMode === 'PER_PERSON') {
-                                  if (bookingOptionData.priceTiers && bookingOptionData.priceTiers.length > 0) {
-                                    const minPrice = Math.min(...bookingOptionData.priceTiers.map((tier: any) => tier.pricePerParticipant));
-                                    const maxPrice = Math.max(...bookingOptionData.priceTiers.map((tier: any) => tier.pricePerParticipant));
-                                    return `${minPrice.toFixed(2)} US$ - ${maxPrice.toFixed(2)} US$ por persona`;
-                                  } else {
-                                    return 'No definido';
+                                   if (bookingOptionData.priceTiers && bookingOptionData.priceTiers.length > 1) {
+                                      const minPrice = Math.min(...bookingOptionData.priceTiers.map((tier: any) => tier.pricePerParticipant));
+                                      const minCurrency = bookingOptionData.priceTiers.find((tier: any) => tier.pricePerParticipant === minPrice)?.currency;
+                                      const maxPrice = Math.max(...bookingOptionData.priceTiers.map((tier: any) => tier.pricePerParticipant));
+                                      const maxCurrency = bookingOptionData.priceTiers.find((tier: any) => tier.pricePerParticipant === maxPrice)?.currency;
+                                      return `${minPrice.toFixed(2)} ${minCurrency.toUpperCase()} - ${maxPrice.toFixed(2)} ${maxCurrency.toUpperCase()}`;
+                                   } else if (bookingOptionData.priceTiers && bookingOptionData.priceTiers.length === 1) {
+                                     const currency = bookingOptionData.priceTiers[0].currency;
+                                     return `${bookingOptionData.priceTiers[0].pricePerParticipant.toFixed(2)} ${currency.toUpperCase()} `;
+                                    } else {
+                                      return 'No definido';
                                   }
                                 } else {
                                   // Para otros modos de pricing (PER_GROUP, etc.)
                                   if (bookingOptionData.priceTiers && bookingOptionData.priceTiers.length > 0) {
                                     const minPrice = Math.min(...bookingOptionData.priceTiers.map((tier: any) => tier.totalPrice));
+                                    const minCurrency = bookingOptionData.priceTiers.find((tier: any) => tier.totalPrice === minPrice)?.currency;
                                     const maxPrice = Math.max(...bookingOptionData.priceTiers.map((tier: any) => tier.totalPrice));
-                                    return `${minPrice.toFixed(2)} US$ - ${maxPrice.toFixed(2)} US$ por grupo`;
+                                    const maxCurrency = bookingOptionData.priceTiers.find((tier: any) => tier.totalPrice === maxPrice)?.currency;
+                                    return `${minPrice.toFixed(2)} ${minCurrency.toUpperCase()} - ${maxPrice.toFixed(2)} ${maxCurrency.toUpperCase()}`;
                                   } else {
                                     return 'No definido';
                                   }

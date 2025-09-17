@@ -269,7 +269,7 @@ export default function StepOptionCutOff() {
   };
 
   const handleBack = () => {
-    navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?optionId=${optionId}`, {
+    navigateToActivityStep(navigate, `/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${lang}&currency=${currency}`, {
       activityId,
       lang,
       currency,

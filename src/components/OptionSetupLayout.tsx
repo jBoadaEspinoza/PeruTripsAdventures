@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useExtranetAuth } from '../hooks/useExtranetAuth';
 import { getTranslation } from '../utils/translations';
 import { activitiesApi } from '../api/activities';
-import { useAppSelector } from '../redux/store';
 
 const OptionSetupLayout: React.FC<{ 
   children: React.ReactNode;
@@ -15,11 +15,14 @@ const OptionSetupLayout: React.FC<{
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { language, setLanguage } = useLanguage();
+  const { currency } = useCurrency();
   const { isAuthenticated, isInitialized, isValidating } = useExtranetAuth();
   
-  // Obtener activityId del Redux store
-  const { activityId } = useAppSelector(state => state.activityCreation);
+  // Obtener activityId y optionId de la URL
+  const activityId = searchParams.get('activityId');
+  const optionId = searchParams.get('optionId');
   
   // Estado para el título de la actividad
   const [activityTitle, setActivityTitle] = useState<string>('Nueva Actividad');
@@ -31,21 +34,27 @@ const OptionSetupLayout: React.FC<{
   };
 
   const handleBackToActivity = () => {
-    navigate('/extranet/activity/addOptions');
+    navigate(`/extranet/activity/createOptions?activityId=${activityId}&lang=${language}&currency=${currency}&currentStep=9`);
   };
 
   // Función para obtener el título de la actividad
   const fetchActivityTitle = async (id: string, lang: string) => {
-    if (!id) return;
+    if (!id) {
+      console.warn('OptionSetupLayout: No hay activityId para cargar');
+      setActivityTitle('Nueva Actividad');
+      return;
+    }
     
     setIsLoadingActivity(true);
     try {
-      const activity = await activitiesApi.getById(id,lang);
+      console.log('OptionSetupLayout: Cargando actividad con ID:', id, 'idioma:', lang);
+      const activity = await activitiesApi.getById(id, lang);
+      
       if (activity && activity.title) {
         setActivityTitle(activity.title);
         console.log('OptionSetupLayout: Título de actividad obtenido:', activity.title);
       } else {
-        console.error('OptionSetupLayout: Actividad sin título');
+        console.warn('OptionSetupLayout: Actividad sin título, datos recibidos:', activity);
         setActivityTitle('Actividad sin título');
       }
     } catch (error) {
@@ -117,37 +126,37 @@ const OptionSetupLayout: React.FC<{
   // Pasos para la configuración de opciones
   const optionSteps = [
     { 
-      id: 'optionSettings', 
+      id: 'optionSetup', 
       title: getTranslation('optionSetup.menu.optionSettings', language), 
-      path: '/extranet/activity/optionSettings',
+      path: `/extranet/activity/createOptionSetup?activityId=${activityId}&optionId=${optionId}&lang=${language}&currency=${currency}&currentStep=9`,
       completed: currentSection !== 'optionSettings' && currentSection !== '',
       icon: 'fas fa-cog'
     },
     { 
       id: 'meetingPickup', 
       title: getTranslation('optionSetup.menu.meetingPickup', language), 
-      path: '/extranet/activity/meetingPickup',
+      path: `/extranet/activity/createOptionMeetingPickup?activityId=${activityId}&optionId=${optionId}&lang=${language}&currency=${currency}&currentStep=9`,
       completed: ['meetingPickup', 'availabilityPricing', 'timeLimit'].includes(currentSection),
       icon: 'fas fa-map-marker-alt'
     },
     { 
       id: 'availabilityPricing', 
       title: getTranslation('optionSetup.menu.availabilityPricing', language), 
-      path: '/extranet/activity/availabilityPricing',
+      path: `/extranet/activity/availabilityPricing?activityId=${activityId}&optionId=${optionId}&lang=${language}&currency=${currency}&currentStep=9`,
       completed: ['availabilityPricing', 'timeLimit'].includes(currentSection),
       icon: 'fas fa-calendar-alt'
     },
     { 
       id: 'timeLimit', 
       title: getTranslation('optionSetup.menu.timeLimit', language), 
-      path: '/extranet/activity/timeLimit',
+      path: `/extranet/activity/cutOff?activityId=${activityId}&optionId=${optionId}&lang=${language}&currency=${currency}&currentStep=9`,
       completed: currentSection === 'timeLimit',
       icon: 'fas fa-clock'
     }
   ];
 
-  const isCurrentStep = (stepPath: string) => {
-    return location.pathname === stepPath;
+  const isCurrentStep = (stepId: string) => {
+    return currentSection === stepId;
   };
 
   const handleStepClick = (path: string) => {
@@ -255,15 +264,18 @@ const OptionSetupLayout: React.FC<{
               </h6>
             </div>
             <nav className="nav flex-column">
-              {optionSteps.map((step) => (
+              {optionSteps.map((step, index) => (
                 <div key={step.id} className="nav-item mb-2">
                   <div 
-                    className={`nav-link p-2 rounded cursor-pointer ${isCurrentStep(step.path) ? 'bg-outline-primary text-white' : 'text-white'}`}
+                    className={`nav-link p-2 rounded cursor-pointer ${isCurrentStep(step.id) ? 'bg-outline-primary text-white' : 'text-white'}`}
                     onClick={() => handleStepClick(step.path)}
                     style={{ cursor: 'pointer' }}
                   >
                     <div className="d-flex align-items-center">
-                      {step.completed ? (
+                     
+                      {isCurrentStep(step.id) ? (
+                        <i className="fas fa-arrow-right text-white me-2" style={{ width: '16px' }}></i>
+                      ) : step.completed ? (
                         <i 
                           className="fas fa-check-circle text-success me-2 step-completed-icon" 
                           style={{ 
@@ -273,8 +285,6 @@ const OptionSetupLayout: React.FC<{
                             color: '#28a745'
                           }}
                         ></i>
-                      ) : isCurrentStep(step.path) ? (
-                        <div className="me-2" style={{ width: '16px' }}></div>
                       ) : ""}
                       <span className="small">{step.title}</span>
                     </div>
