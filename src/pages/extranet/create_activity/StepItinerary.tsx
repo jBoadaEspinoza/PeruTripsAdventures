@@ -23,6 +23,10 @@ const StepItinerary: React.FC = () => {
   const [itineraryData, setItineraryData] = useState<any>(null);
   const [hideButtonCreateItinerary, setHideButtonCreateItinerary] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
+  const [showItineraryTypeSelection, setShowItineraryTypeSelection] = useState(false);
+  const [selectedItineraryType, setSelectedItineraryType] = useState<'activity' | 'transfer' | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // No need to set current step in Redux anymore, it comes from URL
 
@@ -69,8 +73,44 @@ const StepItinerary: React.FC = () => {
     });
   };
 
+  const handleSkipItinerary = async () => {
+    if (!activityId) {
+      console.error('No activityId available for skipping itinerary');
+      return;
+    }
+
+    await withLoading(async () => {
+      try {
+        const response = await activitiesApi.skipItinerary({
+          activityId,
+          lang
+        });
+
+        if(response.success){
+          // Mostrar mensaje de éxito en modal
+          // El mensaje enviado cuando success = true es 'Actividad creada exitosamente'
+          setSuccessMessage(response.message || 'Actividad creada exitosamente');
+          setShowSuccessModal(true);
+        } else {
+          // Debe mostrar el error en el modal
+          setSuccessMessage(response.message || 'Error al saltar el itinerario');
+          setShowSuccessModal(true);
+        }
+      } catch (error) {
+        console.error('Error calling skipItinerary API:', error);
+        // En caso de error, navegar al paso de revisión por defecto
+        navigateToActivityStep(navigate, '/extranet/activity/review', {
+          activityId,
+          lang,
+          currency,
+          currentStep
+        });
+      }
+    }, 'skip-itinerary');
+  };
+
   const handleCreateItinerary = () => {
-    // Configurar datos del itinerario con solo Start y End
+    // Configurar datos del itinerario con solo Start y End (sin items)
     const newItineraryData = {
       title: 'Crear tu itinerario',
       start: {
@@ -85,12 +125,39 @@ const StepItinerary: React.FC = () => {
         title: 'Regresa a:',
         description: 'Marina Turistica de Paracas'
       },
-      items: []
+      items: [] // Array vacío para que aparezca automáticamente el flujo de selección
     };
     
     setItineraryData(newItineraryData);
     setHideButtonCreateItinerary(true);
     setIsEditable(true);
+  };
+
+  const handleItineraryTypeSelection = (type: 'activity' | 'transfer') => {
+    setSelectedItineraryType(type);
+  };
+
+  const handleAddItem = (item: any) => {
+    if (itineraryData) {
+      const updatedItineraryData = {
+        ...itineraryData,
+        items: [...itineraryData.items, item]
+      };
+      setItineraryData(updatedItineraryData);
+    }
+  };
+
+  const handleBackToTypeSelection = () => {
+    setShowItineraryTypeSelection(true);
+    setSelectedItineraryType(null);
+    setItineraryData(null);
+    setIsEditable(false);
+  };
+
+  const handleSuccessModalAccept = () => {
+    setShowSuccessModal(false);
+    // Navegar al listado de actividades
+    navigate(`/extranet/list-activities?lang=${lang}&currency=${currency}`);
   };
   
   return (
@@ -116,6 +183,7 @@ const StepItinerary: React.FC = () => {
                   {getTranslation('stepItinerary.description', language)}
                 </p>
 
+
                 {/* Contenido principal con ItinerarySchedule y botón */}
                 <div className="row">
                   {/* Left side - ItinerarySchedule */}
@@ -130,18 +198,30 @@ const StepItinerary: React.FC = () => {
                   <div className="col-md-4">
                       <div className="h-100 d-flex flex-column justify-content-center">
                       <div className="d-flex justify-content-center">
-                        {/* Botón "Crear nuevo itinerario" si no hay itinerario en booking options y no está en modo editable */}
-                        {(!activity?.bookingOptions || activity.bookingOptions.length === 0) && !isEditable && (
+                        {/* Botón condicional basado en si hay booking options y si se ha seleccionado un tipo */}
+                        {(!activity?.bookingOptions || activity.bookingOptions.length === 0) ? (
+                          /* Si hideButtonCreateItinerary es true, no mostrar el botón de crear itinerario */
+                          !hideButtonCreateItinerary && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-lg"
+                              onClick={handleCreateItinerary}
+                              disabled={isLoadingActivity}
+                            >
+                              {getTranslation('stepItinerary.createItinerary', language)}
+                            </button>
+                          )
+                        ) : (
                           <button
                             type="button"
                             className="btn btn-primary btn-lg"
-                            onClick={handleCreateItinerary}
+                            onClick={selectedItineraryType ? handleBackToTypeSelection : handleCreateItinerary}
                             disabled={isLoadingActivity}
                           >
-                            {isLoadingActivity ? (
-                              <i className="fas fa-spinner fa-spin me-2"></i>
-                            ) : null}
-                            {getTranslation('stepItinerary.createItinerary', language)}
+                            {selectedItineraryType 
+                              ? getTranslation('stepItinerary.continueCreatingItinerary', language)
+                              : getTranslation('stepItinerary.createItinerary', language)
+                            }
                           </button>
                         )}
                       </div>
@@ -155,28 +235,68 @@ const StepItinerary: React.FC = () => {
 
         {/* Botones de navegación */}
         <div className="row mt-4">
-          <div className="col-12 d-flex justify-content-between">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleBack}
-            >
-              <i className="fas fa-arrow-left me-2"></i>
-              {getTranslation('common.back', language)}
-              </button> 
-              
-              <button
-                type="button"
-                className="btn btn-primary ms-2"
-                onClick={handleContinue}
-                disabled={!activity?.isActive || activity.bookingOptions.length === 0 || hideButtonCreateItinerary}
-              >
-                {getTranslation('common.continue', language)}
-                <i className="fas fa-arrow-right ms-2"></i>
-              </button>
-            </div>
+          <div className="col-12 d-flex justify-content-end">
+            {/* Si hideButtonCreateItinerary es true, no mostrar los botones de navegación */}
+            {!hideButtonCreateItinerary && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleBack}
+                >
+                  <i className="fas fa-arrow-left me-2"></i>
+                  {getTranslation('common.back', language)}
+                </button> 
+                <button
+                  type="button"
+                  className="btn btn-secondary ms-2"
+                  onClick={handleSkipItinerary}
+                >
+                  {getTranslation('stepItinerary.skip', language)}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary ms-2"
+                  onClick={handleContinue}
+                  disabled={!activity?.isActive || activity.bookingOptions.length === 0 || hideButtonCreateItinerary}
+                >
+                  {getTranslation('stepItinerary.publish', language)}
+                  <i className="fas fa-arrow-right ms-2"></i>
+                </button>
+              </>
+            )}
+          </div>
           </div>
         </div>
+
+        {/* Modal de Éxito */}
+        {showSuccessModal && (
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title text-success">
+                    <i className="fas fa-check-circle me-2"></i>
+                    {getTranslation('common.success', language)}
+                  </h5>
+                </div>
+                <div className="modal-body pt-0">
+                  <p className="mb-0">{successMessage}</p>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    onClick={handleSuccessModalAccept}
+                  >
+                    <i className="fas fa-check me-2"></i>
+                    {getTranslation('common.accept', language)}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
     </ActivityCreationLayout>
   );

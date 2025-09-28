@@ -6,6 +6,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { getTranslation } from '../utils/translations';
 import ActivityGrid from '../components/ActivityGrid';
 import type { ActivityCardData } from '../components/ActivityCard';
+// import { useExtranetLoading } from '../../../hooks/useExtranetLoading';
 
 const Activities: React.FC = () => {
   const { language } = useLanguage();
@@ -19,6 +20,7 @@ const Activities: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [destinations, setDestinations] = useState<string[]>([]);
+  // const { withLoading } = useExtranetLoading();
 
   // Fetch destinations for filter
   useEffect(() => {
@@ -51,7 +53,8 @@ const Activities: React.FC = () => {
           page: currentPage - 1,
           size: itemsPerPage,
           lang: language,
-          currency: currency
+          currency: currency,
+          active: true
         };
 
         const response = await activitiesApi.search(apiSearchParams);
@@ -71,7 +74,7 @@ const Activities: React.FC = () => {
     };
 
     fetchActivities();
-  }, [currentPage, language, currency]);
+  }, [currentPage, language, currency, itemsPerPage]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +149,7 @@ const Activities: React.FC = () => {
         const response = await activitiesApi.search(apiSearchParams);
 
         if (response.success) {
+          console.log('Response data right now:', response.data);
           setActivities(response.data);
           setTotalPages(response.totalPages);
         } else {
@@ -294,7 +298,10 @@ const Activities: React.FC = () => {
       {/* Activities Grid */}
       <div className="row mb-4">
         <div className="col-12">
-          <ActivityGrid activities={activities.map(convertToActivityCardData)} />
+          <ActivityGrid 
+            activities={activities.map(convertToActivityCardData)} 
+            loading={loading}
+          />
         </div>
       </div>
 

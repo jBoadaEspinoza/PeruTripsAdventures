@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslation } from '../utils/translations';
 
@@ -32,6 +32,11 @@ interface ItineraryScheduleProps {
   onSubItemMoveUp?: (itemId: string, subItemId: string) => void;
   onSubItemMoveDown?: (itemId: string, subItemId: string) => void;
   onAddSegment?: (afterItemId: string) => void;
+  onAddItem?: (item: ItineraryItem) => void;
+  showTypeSelection?: boolean;
+  selectedType?: 'activity' | 'transfer' | null;
+  onTypeSelect?: (type: 'activity' | 'transfer') => void;
+  onTypeSelectionBack?: () => void;
 }
 
 // Configuración de tipos de elementos
@@ -63,27 +68,15 @@ const ITEM_TYPE_CONFIG = {
 };
 
 const SUB_ITEM_CONFIG = {
-  start: {
-    icon: 'fas fa-home',
-    color: 'bg-warning text-white',
-    size: '20px',
-    fontSize: '8px'
-  },
-  end: {
-    icon: 'fas fa-home',
-    color: 'bg-warning text-white',
-    size: '20px',
-    fontSize: '8px'
-  },
   activity: {
-    icon: 'fas fa-suitcase-rolling',
-    color: 'bg-primary text-white',
+    icon: 'fas fa-star',
+    color: 'bg-success text-white',
     size: '20px',
     fontSize: '8px'
   },
   route: {
     icon: 'fas fa-route',
-    color: 'bg-white border border-dark text-dark',
+    color: 'bg-info text-white',
     size: '20px',
     fontSize: '8px'
   }
@@ -99,9 +92,49 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
   onItemMoveDown,
   onSubItemMoveUp,
   onSubItemMoveDown,
-  onAddSegment
+  onAddSegment,
+  onAddItem,
+  showTypeSelection = false,
+  selectedType = null,
+  onTypeSelect,
+  onTypeSelectionBack
 }) => {
   const { language } = useLanguage();
+  const [localSelectedType, setLocalSelectedType] = useState<'activity' | 'transfer' | null>(selectedType);
+  const [showAddSegmentFlow, setShowAddSegmentFlow] = useState(false);
+  const [showActivityDefinition, setShowActivityDefinition] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showActivityDetails, setShowActivityDetails] = useState(false);
+
+  // Determinar si debe mostrar la selección de tipo automáticamente
+  const shouldShowTypeSelection = (showTypeSelection || showAddSegmentFlow) && !showActivityDefinition && !showActivityDetails;
+
+  // Opciones de actividades predefinidas
+  const activityOptions = [
+    'Pausa',
+    'Parada para hacer fotos',
+    'Visita',
+    'Tour guiado',
+    'Tiempo libre',
+    'Comida',
+    'Transporte',
+    'Check-in',
+    'Check-out',
+    'Actividad cultural',
+    'Deportes',
+    'Compras'
+  ];
+
+  // Filtrar opciones basadas en la búsqueda
+  const filteredActivities = activityOptions.filter(activity =>
+    activity.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Sincronizar el estado local con el prop
+  useEffect(() => {
+    setLocalSelectedType(selectedType);
+  }, [selectedType]);
 
   // Datos de ejemplo por defecto
   const defaultData: ItineraryData = {
@@ -169,7 +202,12 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
       return <i className={item.icon}></i>;
     }
     
-    const config = isSubItem ? SUB_ITEM_CONFIG[item.type] : ITEM_TYPE_CONFIG[item.type];
+    if (isSubItem) {
+      const config = SUB_ITEM_CONFIG[item.type as keyof typeof SUB_ITEM_CONFIG] || ITEM_TYPE_CONFIG[item.type];
+      return <i className={config?.icon || 'fas fa-circle'}></i>;
+    }
+    
+    const config = ITEM_TYPE_CONFIG[item.type];
     return <i className={config?.icon || 'fas fa-circle'}></i>;
   };
 
@@ -178,13 +216,18 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
       return item.color;
     }
     
-    const config = isSubItem ? SUB_ITEM_CONFIG[item.type] : ITEM_TYPE_CONFIG[item.type];
+    if (isSubItem) {
+      const config = SUB_ITEM_CONFIG[item.type as keyof typeof SUB_ITEM_CONFIG] || ITEM_TYPE_CONFIG[item.type];
+      return config?.color || 'bg-secondary text-white';
+    }
+    
+    const config = ITEM_TYPE_CONFIG[item.type];
     return config?.color || 'bg-secondary text-white';
   };
 
   const getItemSize = (item: ItineraryItem, isSubItem: boolean = false) => {
     if (isSubItem) {
-      const config = SUB_ITEM_CONFIG[item.type];
+      const config = SUB_ITEM_CONFIG[item.type as keyof typeof SUB_ITEM_CONFIG] || ITEM_TYPE_CONFIG[item.type];
       return config?.size || '20px';
     }
     const config = ITEM_TYPE_CONFIG[item.type];
@@ -193,7 +236,7 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
 
   const getItemFontSize = (item: ItineraryItem, isSubItem: boolean = false) => {
     if (isSubItem) {
-      const config = SUB_ITEM_CONFIG[item.type];
+      const config = SUB_ITEM_CONFIG[item.type as keyof typeof SUB_ITEM_CONFIG] || ITEM_TYPE_CONFIG[item.type];
       return config?.fontSize || '8px';
     }
     const config = ITEM_TYPE_CONFIG[item.type];
@@ -388,9 +431,9 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
   };
 
   const handleAddSegment = (itemId: string) => {
-    if (onAddSegment) {
-      onAddSegment(itemId);
-    }
+    // Activar el flujo de selección de tipo en lugar de agregar directamente
+    setShowAddSegmentFlow(true);
+    setLocalSelectedType(null); // Resetear la selección
     setContextMenu(null);
   };
 
@@ -403,10 +446,49 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
     setContextMenu(null);
   };
 
+  // Función para calcular la posición Y del centro de un círculo
+  const calculateCircleCenterY = (itemIndex: number, isStart: boolean = false, isEnd: boolean = false) => {
+    let currentY = 20; // Posición inicial
+    
+    if (isStart) {
+      return currentY + 20; // Centro del círculo START (radio 20px)
+    }
+    
+    // Agregar altura del START
+    currentY += 40 + 20; // Altura del círculo + margen
+    
+    // Si es el flujo de selección
+    if (shouldShowTypeSelection && itemIndex === -1) {
+      return currentY + 20; // Centro del círculo del flujo
+    }
+    
+    // Agregar altura del flujo de selección si está visible
+    if (shouldShowTypeSelection) {
+      currentY += 200; // Altura aproximada del flujo de selección
+    }
+    
+    // Agregar altura de los items del itinerario
+    for (let i = 0; i < itemIndex; i++) {
+      const item = itineraryData.items[i];
+      const itemHeight = calculateItemHeight(item);
+      currentY += itemHeight + 20; // Altura del item + margen
+    }
+    
+    if (isEnd) {
+      // Para el END, agregar altura de todos los items restantes
+      for (let i = itemIndex; i < itineraryData.items.length; i++) {
+        const item = itineraryData.items[i];
+        const itemHeight = calculateItemHeight(item);
+        currentY += itemHeight + 20; // Altura del item + margen
+      }
+      return currentY + 20; // Centro del círculo END
+    }
+    
+    return currentY + 20; // Centro del círculo del item
+  };
+
   return (
     <div className={className}>
-      
-      
       {/* Timeline */}
       <div className="position-relative">
         {/* Timeline items */}
@@ -472,9 +554,21 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
                     nextItem.subItems!.reduce((total, subItem) => total + calculateSubItemHeight(subItem), 0) + 16 : 0;
                   const nextItemHeight = 48 + nextItemSubItemsHeight;
                   
-                  // Calcular la distancia exacta entre el centro del Start y el centro del primer item
-                  const startCenterY = 20; // Centro del círculo del Start (40px / 2)
-                  const nextItemCenterY = 20 + 20 + (nextItemHeight / 2); // Margen + centro del siguiente
+                  // Calcular la distancia exacta entre el centro del Start y el centro del siguiente elemento
+                  const startCenterY = calculateCircleCenterY(-1, true, false);
+                  let nextItemCenterY;
+                  
+                  if (shouldShowTypeSelection) {
+                    // Si hay flujo de selección, conectar con él
+                    nextItemCenterY = calculateCircleCenterY(-1, false, false);
+                  } else if (itineraryData.items.length > 0) {
+                    // Si hay items, conectar con el primero
+                    nextItemCenterY = calculateCircleCenterY(0, false, false);
+                  } else {
+                    // Si no hay nada, conectar con END
+                    nextItemCenterY = calculateCircleCenterY(-1, false, true);
+                  }
+                  
                   const lineHeight = nextItemCenterY - startCenterY;
                   
                   return (
@@ -494,6 +588,377 @@ const ItinerarySchedule: React.FC<ItineraryScheduleProps> = ({
               </div>
             );
           })()}
+          {/* Flujo de selección de tipo - Solo cuando se debe mostrar */}
+          {shouldShowTypeSelection && (
+            <div key="type-selection" className="position-relative mb-4">
+               {/* Línea conectora desde START TO END*/}
+               {(() => {
+                 // Calcular la distancia exacta entre el centro del Start y el centro del END ATRAVESANDO EL FLUJO DE SELECCIÓN
+                 const startCenterY = calculateCircleCenterY(-1, true, false);
+                 const endCenterY = calculateCircleCenterY(-1, false, true);
+                 const lineHeight  = endCenterY - startCenterY;
+                
+                return (
+                  <div 
+                    className="position-absolute" 
+                    style={{ 
+                      left: '20px', 
+                      top: `${startCenterY}px`,
+                      width: '3px', 
+                      height: `${lineHeight}px`, 
+                      backgroundColor: '#ff6b35',
+                      zIndex: 1
+                    }}
+                  ></div>
+                );
+              })()}   
+                         
+              {/* Contenido del flujo de selección */}
+              <div className="ms-5">
+                <div className="card border-0 shadow-sm">
+                  <div className="card-body p-4">
+                    <h5 className="mb-4 text-primary">
+                      {getTranslation('stepItinerary.typeSelection.title', language)}
+                    </h5>
+                    
+                    <div className="mb-4">
+                      <div className="form-check mb-3">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="itineraryType"
+                          id="activityType"
+                          value="activity"
+                          onChange={() => setLocalSelectedType('activity')}
+                          checked={localSelectedType === 'activity'}
+                        />
+                        <label className="form-check-label" htmlFor="activityType">
+                          <strong>{getTranslation('stepItinerary.typeSelection.activity.title', language)}</strong>
+                          <br />
+                          <small className="text-muted">
+                            {getTranslation('stepItinerary.typeSelection.activity.description', language)}
+                          </small>
+                        </label>
+                      </div>
+                      
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="itineraryType"
+                          id="transferType"
+                          value="transfer"
+                          onChange={() => setLocalSelectedType('transfer')}
+                          checked={localSelectedType === 'transfer'}
+                        />
+                        <label className="form-check-label" htmlFor="transferType">
+                          <strong>{getTranslation('stepItinerary.typeSelection.transfer.title', language)}</strong>
+                          <br />
+                          <small className="text-muted">
+                            {getTranslation('stepItinerary.typeSelection.transfer.description', language)}
+                          </small>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div className="d-flex justify-content-between">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          if (showAddSegmentFlow) {
+                            setShowAddSegmentFlow(false);
+                          } else if (onTypeSelectionBack) {
+                            onTypeSelectionBack();
+                          }
+                        }}
+                      >
+                        <i className="fas fa-arrow-left me-2"></i>
+                        {getTranslation('common.back', language)}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          alert("hola")
+                          console.log('localSelectedType:', localSelectedType);
+                          console.log('onTypeSelect:', onTypeSelect);
+                          
+                          if (localSelectedType) {
+                            // Llamar a onTypeSelect si está definido
+                            if (onTypeSelect) {
+                              onTypeSelect(localSelectedType);
+                            }
+                            
+                            // Si es una actividad, mostrar el flujo de definición
+                            if (localSelectedType === 'activity') {
+                              console.log('Activando flujo de definición de actividad');
+                              setShowActivityDefinition(true);
+                              // Cerrar el flujo de selección de tipo
+                              setShowAddSegmentFlow(false);
+                              console.log('showActivityDefinition debería ser true ahora');
+                            } else {
+                              // Si es traslado, agregar directamente
+                              if (onAddItem) {
+                                const newItem: ItineraryItem = {
+                                  id: `new-${Date.now()}`,
+                                  type: 'route',
+                                  title: 'Nuevo traslado',
+                                  description: 'Descripción del traslado'
+                                };
+                                onAddItem(newItem);
+                              }
+                              
+                              // Cerrar el flujo de selección
+                              setShowAddSegmentFlow(false);
+                              setLocalSelectedType(null);
+                            }
+                          } else {
+                            console.log('No hay tipo seleccionado');
+                          }
+                        }}
+                        disabled={!localSelectedType}
+                      >
+                        {getTranslation('common.next', language)}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Flujo de definición de actividad - Solo cuando se debe mostrar */}
+          {showActivityDefinition && (() => {
+            console.log('Renderizando flujo de definición de actividad');
+            return (
+              <div key="activity-definition" className="position-relative mb-4">
+              {/* Línea conectora desde START TO END*/}
+              {(() => {
+                // Calcular la distancia exacta entre el centro del Start y el centro del END ATRAVESANDO EL FLUJO DE DEFINICIÓN
+                const startCenterY = calculateCircleCenterY(-1, true, false);
+                const endCenterY = calculateCircleCenterY(-1, false, true);
+                const lineHeight  = endCenterY - startCenterY;
+                
+                return (
+                  <div 
+                    className="position-absolute" 
+                    style={{ 
+                      left: '20px', 
+                      top: `${startCenterY}px`,
+                      width: '3px', 
+                      height: `${lineHeight}px`, 
+                      backgroundColor: '#ff6b35',
+                      zIndex: 1
+                    }}
+                  ></div>
+                );
+              })()}   
+                          
+              {/* Contenido del flujo de definición de actividad */}
+              <div className="ms-5">
+                <div className="card border-0 shadow-sm">
+                  <div className="card-body p-4">
+                    <h5 className="mb-4 text-primary">
+                      ¿Qué sucede durante esta parte de la experiencia?
+                    </h5>
+                    
+                    <p className="mb-4 text-muted">
+                      Indica lo que sucede durante esta parte de tu experiencia en la barra de búsqueda a continuación.
+                    </p>
+                    
+                    <div className="mb-4">
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="fas fa-search"></i>
+                        </span>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Introduce la actividad aquí"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <button className="btn btn-link text-primary">
+                          Seleccionar de la lista
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {filteredActivities.map((activity, index) => (
+                        <div key={index} className="form-check mb-2">
+                          <input
+                            className="form-check-input"
+                            type="radio"
+                            name="activitySelection"
+                            id={`activity-${index}`}
+                            value={activity}
+                            onChange={() => setSelectedActivity(activity)}
+                            checked={selectedActivity === activity}
+                          />
+                          <label className="form-check-label" htmlFor={`activity-${index}`}>
+                            {activity}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="d-flex justify-content-between">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setShowActivityDefinition(false);
+                          setSelectedActivity('');
+                          setSearchQuery('');
+                        }}
+                      >
+                        <i className="fas fa-arrow-left me-2"></i>
+                        {getTranslation('common.back', language)}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          if (selectedActivity) {
+                            console.log('Activando flujo de detalles de actividad');
+                            // Continuar con el siguiente paso de detalles de la actividad
+                            setShowActivityDetails(true);
+                          }
+                        }}
+                        disabled={!selectedActivity}
+                      >
+                        {getTranslation('common.next', language)}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            );
+          })()}
+          
+          {/* Flujo de detalles de actividad - Solo cuando se debe mostrar */}
+          {showActivityDetails && (
+            <div key="activity-details" className="position-relative mb-4">
+              {/* Línea conectora desde START TO END*/}
+              {(() => {
+                // Calcular la distancia exacta entre el centro del Start y el centro del END ATRAVESANDO EL FLUJO DE DETALLES
+                const startCenterY = calculateCircleCenterY(-1, true, false);
+                const endCenterY = calculateCircleCenterY(-1, false, true);
+                const lineHeight  = endCenterY - startCenterY;
+                
+                return (
+                  <div 
+                    className="position-absolute" 
+                    style={{ 
+                      left: '20px', 
+                      top: `${startCenterY}px`,
+                      width: '3px', 
+                      height: `${lineHeight}px`, 
+                      backgroundColor: '#ff6b35',
+                      zIndex: 1
+                    }}
+                  ></div>
+                );
+              })()}   
+                          
+              {/* Contenido del flujo de detalles de actividad */}
+              <div className="ms-5">
+                <div className="card border-0 shadow-sm">
+                  <div className="card-body p-4">
+                    <h5 className="mb-4 text-primary">
+                      ¿Qué sucede durante esta parte de la experiencia?
+                    </h5>
+                    
+                    <p className="mb-4 text-muted">
+                      Indica lo que sucede durante esta parte de tu experiencia en la barra de búsqueda a continuación.
+                    </p>
+                    
+                    <div className="mb-4">
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="fas fa-search"></i>
+                        </span>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Introduce la actividad aquí"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <button className="btn btn-link text-primary">
+                          • Seleccionar de la lista
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {filteredActivities.map((activity, index) => (
+                        <div key={index} className="form-check mb-2">
+                          <input
+                            className="form-check-input"
+                            type="radio"
+                            name="activitySelectionDetails"
+                            id={`activity-details-${index}`}
+                            value={activity}
+                            onChange={() => setSelectedActivity(activity)}
+                            checked={selectedActivity === activity}
+                          />
+                          <label className="form-check-label" htmlFor={`activity-details-${index}`}>
+                            {activity}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="d-flex justify-content-between">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setShowActivityDetails(false);
+                        }}
+                      >
+                        <i className="fas fa-arrow-left me-2"></i>
+                        {getTranslation('common.back', language)}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          if (selectedActivity && onAddItem) {
+                            const newItem: ItineraryItem = {
+                              id: `new-${Date.now()}`,
+                              type: 'activity',
+                              title: selectedActivity,
+                              description: `Descripción de ${selectedActivity}`
+                            };
+                            onAddItem(newItem);
+                          }
+                          
+                          // Cerrar todos los flujos
+                          setShowActivityDetails(false);
+                          setShowActivityDefinition(false);
+                          setShowAddSegmentFlow(false);
+                          setLocalSelectedType(null);
+                          setSelectedActivity('');
+                          setSearchQuery('');
+                        }}
+                        disabled={!selectedActivity}
+                      >
+                        {getTranslation('common.next', language)}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Middle items */}
           {itineraryData.items.map((item, index) => {

@@ -2,7 +2,22 @@ import { apiGet } from './apiConfig';
 import { apiPost } from './apiConfig';
 import { getRuc } from '../utils/configUtils';
 
+export interface Itinerary {
+  id: number;
+  title: string;
+  description: string;
+  duration: string;
+  additionalFee: boolean;
+}
 
+export interface pointOfInterestRequest {
+  name: string;
+  latitude: number;
+  longitude: number;
+  placeId: number;
+  googlePlaceId: string;
+  isMainDestination: boolean;
+}
 
 export interface ActivityImage {
   id: number;
@@ -18,9 +33,40 @@ export interface Schedule {
   isActive: boolean;
 }
 
+export interface City {
+  id: number;
+  cityName : string;
+  cityLatitude: number;
+  cityLongitude: number;
+  countryId: string;
+  imageUrl: string;
+  isActive: boolean;
+}
+
+export interface PickupPoint {
+  id: number;
+  city: City;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  notes: string;
+}
+
+export interface PriceTier {
+  id: number;
+  minParticipants: number;
+  maxParticipants: number | null;
+  totalPrice: number;
+  pricePerParticipant: number;
+  commissionPercent: number;
+  currency: string;
+}
+
 export interface BookingOption {
   id: string;
   title: string;
+  durationDays: number;
   durationHours: number;
   durationMinutes: number;
   groupMinSize: number;
@@ -54,12 +100,31 @@ export interface BookingOption {
   lastMinuteAfterFirst: boolean;
   customCutoffBySchedule: boolean;
   isActive: boolean;
+  pickupPoints: PickupPoint[] | null;
   schedules: Schedule[];
+  priceTiers: PriceTier[];
+  itineraries: Itinerary[];
+}
+
+export interface pointOfInterestResponse {
+    id: number;
+    orderIndex: number;
+    name: string;
+    latitude: number;
+    longitude: number;
+    destinationId: number;
+    destinationName: string;
+    isMainDestination: boolean;
+    googlePlaceId: string;
+    accessTypeId: number | null;
+    accessTypeCode: string | null;
+    accessTypeName: string | null;
 }
 
 export interface Activity {
   id: string;
   title: string;
+  rating: number | null;
   presentation: string;
   description: string[];
   recommendations: string[];
@@ -80,10 +145,13 @@ export interface Activity {
   guidanceTypeIsActive: boolean;
   bookingOptions: BookingOption[];
   images: ActivityImage[];
+  pointsOfInterest: pointOfInterestResponse[];
   createAt: string;
   updatedAt: string;
   isActive: boolean;
 }
+
+
 
 export interface SearchResponse {
   success: boolean;
@@ -125,6 +193,7 @@ export interface SearchParams {
   size?: number;
   currency?: string;
   includeBookingOptions?: boolean;
+  active?: boolean | null;
 }
 
 export interface CreateCategoryRequest {
@@ -157,6 +226,7 @@ export interface CreateDescriptionRequest {
   id: string;
   presentation: string;
   description: string;
+  pointOfInterests: pointOfInterestRequest[];
   lang: string;
 }
 
@@ -251,7 +321,21 @@ export interface GetActivityByIdResponse {
   message?: string;
 }
 
+export interface SkipItineraryRequest {
+  activityId: string;
+  lang: string;
+}
 
+export interface SkipItineraryResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    currentStep: number;
+    currentLink: string;
+    nextLink: string;
+    previousLink: string;
+  };
+}
 
 export const activitiesApi = {
   search: async (params: SearchParams): Promise<SearchResponse> => {
@@ -284,7 +368,6 @@ export const activitiesApi = {
       const params = { lang, currency, companyId: getRuc() };
       
       const response = await apiGet<any>(url, { params });
-      
       // Handle different response structures
       if (response && response.data) {
         // If response has a data property, return that
@@ -570,6 +653,23 @@ export const activitiesApi = {
       return {
         success: false,
         message: 'Error al crear opcion de reserva de la actividad'
+      };
+    }
+  },
+  skipItinerary: async (request: SkipItineraryRequest): Promise<SkipItineraryResponse> => {
+    try{
+      const response = await apiPost<SkipItineraryResponse>('/activities/skipItinerary', request);
+      if (response && typeof response === 'object') {
+        if ('success' in response) {
+          return response as SkipItineraryResponse;
+        }
+      }
+      return response;
+    }
+    catch(error: any){
+      return {
+        success: false,
+        message: 'Error al saltar el itinerario de la actividad'
       };
     }
   },

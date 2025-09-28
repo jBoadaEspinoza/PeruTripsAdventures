@@ -391,6 +391,10 @@ export const translations: Translations = {
     es: 'Recomendaciones',
     en: 'Recommendations'
   },
+  'detail.restrictions': {
+    es: 'Restricciones',
+    en: 'Restrictions'
+  },
   'detail.itinerary': {
     es: 'Itinerario',
     en: 'Itinerary'
@@ -1386,6 +1390,12 @@ export const translations: Translations = {
   'stepItinerary.welcome.description3': { es: 'Esta es nuestra primera versión, pero vendrán más. Estamos mejorando nuestro creador de itinerarios continuamente.', en: 'This is our first version, but more will come. We are continuously improving our itinerary creator.' },
   'stepItinerary.welcome.description4': { es: 'Gracias, y ¡a crear se ha dicho!', en: 'Thank you, and let\'s get creating!' },
   'stepItinerary.createItinerary': { es: 'Crear itinerario', en: 'Create itinerary' },
+  'stepItinerary.continueCreatingItinerary': { es: 'Seguir creando itinerario', en: 'Continue creating itinerary' },
+  'stepItinerary.typeSelection.title': { es: '¿Qué pasa después?', en: 'What happens next?' },
+  'stepItinerary.typeSelection.activity.title': { es: 'Una actividad (la razón por la que alguien compraría esta experiencia)', en: 'An activity (the reason why someone would buy this experience)' },
+  'stepItinerary.typeSelection.activity.description': { es: 'La razón por la que alguien compraría esta experiencia', en: 'The reason why someone would buy this experience' },
+  'stepItinerary.typeSelection.transfer.title': { es: 'Un traslado (transporte a los puntos destacados de la experiencia)', en: 'A transfer (transport to the highlights of the experience)' },
+  'stepItinerary.typeSelection.transfer.description': { es: 'Transporte a los puntos destacados de la experiencia', en: 'Transport to the highlights of the experience' },
   'stepItinerary.continueCreating': { es: 'Seguir creando', en: 'Continue creating' },
   'stepItinerary.example.title': { es: 'Ejemplo de cómo ven los clientes un itinerario visual.', en: 'Example of how clients see a visual itinerary.' },
   'stepItinerary.day.title': { es: 'Día {dayNumber}', en: 'Day {dayNumber}' },
@@ -1418,7 +1428,8 @@ export const translations: Translations = {
   'stepItinerary.vehicleType.placeholder': { es: 'Elige el tipo de vehículo aquí.', en: 'Choose the type of vehicle here.' },
   'stepItinerary.next': { es: 'Siguiente', en: 'Next' },
   'stepItinerary.back': { es: 'Atrás', en: 'Back' },
-  'stepItinerary.skip': { es: 'Saltar', en: 'Skip' },
+  'stepItinerary.skip': { es: 'Saltar y publicar', en: 'Skip and publish' },
+  'stepItinerary.publish': { es: 'Publicar', en: 'Publish' },
   'stepItinerary.close': { es: 'Cerrar', en: 'Close' },
   'stepItinerary.visualTimeline': { es: 'Itinerario visual', en: 'Visual itinerary' },
   'stepItinerary.itinerarySummary': { es: 'Resumen del Itinerario', en: 'Itinerary Summary' },
@@ -1695,7 +1706,101 @@ export const translations: Translations = {
   'stepCutOff.timeSlots.title': { es: 'Establece la hora límite para las franjas horarias en las que necesites una configuración diferente', en: 'Set the limit time for time slots where you need a different configuration' },
   'stepCutOff.timeSlots.applyToAll': { es: 'Aplicar a todas', en: 'Apply to all' },
   'stepCutOff.buttons.back': { es: 'Atrás', en: 'Back' },
-  'stepCutOff.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' }
+  'stepCutOff.buttons.saveAndContinue': { es: 'Guardar y continuar', en: 'Save and continue' },
+
+  // Dashboard
+  'dashboard.title': {
+    es: 'Dashboard',
+    en: 'Dashboard'
+  },
+  'dashboard.welcome': {
+    es: 'Bienvenido',
+    en: 'Welcome'
+  },
+  'dashboard.user': {
+    es: 'Usuario',
+    en: 'User'
+  },
+  'dashboard.description': {
+    es: 'Este es el panel principal del extranet. Aquí podrás gestionar tus actividades, reservas y configuraciones.',
+    en: 'This is the main extranet panel. Here you can manage your activities, bookings and settings.'
+  },
+  'dashboard.stats.activities': {
+    es: 'Actividades',
+    en: 'Activities'
+  },
+  'dashboard.stats.activitiesDesc': {
+    es: 'Total de actividades',
+    en: 'Total activities'
+  },
+  'dashboard.stats.bookings': {
+    es: 'Reservas',
+    en: 'Bookings'
+  },
+  'dashboard.stats.bookingsDesc': {
+    es: 'Reservas este mes',
+    en: 'Bookings this month'
+  },
+  'dashboard.stats.revenue': {
+    es: 'Ingresos',
+    en: 'Revenue'
+  },
+  'dashboard.stats.revenueDesc': {
+    es: 'Ingresos este mes',
+    en: 'Revenue this month'
+  },
+  'dashboard.stats.rating': {
+    es: 'Calificación',
+    en: 'Rating'
+  },
+  'dashboard.stats.ratingDesc': {
+    es: 'Promedio de reseñas',
+    en: 'Average reviews'
+  },
+  'dashboard.recentActivities.title': {
+    es: 'Actividades Recientes',
+    en: 'Recent Activities'
+  },
+  'dashboard.recentActivities.activity': {
+    es: 'Actividad',
+    en: 'Activity'
+  },
+  'dashboard.recentActivities.status': {
+    es: 'Estado',
+    en: 'Status'
+  },
+  'dashboard.recentActivities.created': {
+    es: 'Creada',
+    en: 'Created'
+  },
+  'dashboard.recentActivities.actions': {
+    es: 'Acciones',
+    en: 'Actions'
+  },
+  'dashboard.recentActivities.active': {
+    es: 'Activo',
+    en: 'Active'
+  },
+  'dashboard.recentActivities.inactive': {
+    es: 'Inactivo',
+    en: 'Inactive'
+  },
+  'dashboard.recentActivities.edit': {
+    es: 'Editar',
+    en: 'Edit'
+  },
+  'dashboard.recentActivities.view': {
+    es: 'Ver',
+    en: 'View'
+  },
+  'dashboard.recentActivities.noActivities': {
+    es: 'No hay actividades recientes',
+    en: 'No recent activities'
+  },
+  'dashboard.error.loadingActivities': {
+    es: 'Error al cargar las actividades del dashboard',
+    en: 'Error loading dashboard activities'
+  }
 };
 
 export const getTranslation = (key: string, language: 'es' | 'en'): string => {

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslation } from '../utils/translations';
+import { placesApi, type PlaceInfoResponse } from '../api/places';
 export interface DestinationCardData {
   id: number;
   cityName: string;
@@ -34,6 +35,39 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  
+  // Estados para información de IA
+  const [placeInfo, setPlaceInfo] = useState<PlaceInfoResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isFetchingRef = useRef(false);
+
+  // Función para obtener información de IA del destino
+  const fetchPlaceInfo = useCallback(async () => {
+    if (!destination.id) {
+      console.log('No hay ID para el destino:', destination.cityName);
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const info = await placesApi.getInfoByIA(destination.id, language);
+      setPlaceInfo(info);
+      
+    } catch (err: any) {
+      console.error('❌ Error obteniendo información de IA:', err);
+      setError(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [destination.id, destination.cityName, language]);
+
+  // Efecto para cargar información cuando el componente se monta
+  useEffect(() => {
+    fetchPlaceInfo();
+  }, [fetchPlaceInfo]);
 
   const getColumnClass = () => {
     const columnMap: Record<number, string> = {
@@ -83,15 +117,57 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           <h5 className="card-title fw-bold mb-2 text-dark" style={{ fontSize: '1.1rem', lineHeight: '1.3' }}>
             {getTranslation(`destination.${destination.cityName}`, language)}
           </h5>
-          <div className="d-flex align-items-center mb-2">
-            <svg className="text-warning me-1" width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="fw-medium me-1">4.8</span>
-            <small className="text-muted">
-              (Destino popular)
-            </small>
-          </div>
+          
+          {/* Información de IA */}
+          {placeInfo && (
+            <div className="mb-3">
+              <p className="small text-muted mb-2" style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>
+                {placeInfo.description}
+              </p>
+              
+              {/* Temperatura actual */}
+              <div className="d-flex align-items-center mb-2">
+                <svg className="text-info me-2" width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                </svg>
+                <div className="small">
+                  <span className="fw-medium text-dark">{placeInfo.currentTemperature}</span>
+                  <span className="text-muted ms-2">Temperatura actual</span>
+                </div>
+              </div>
+              
+              {/* Puntos de interés */}
+              {placeInfo.pointsOfInterest && placeInfo.pointsOfInterest.length > 0 && (
+                <div className="mb-2">
+                  <small className="text-muted d-block mb-1">Puntos de interés:</small>
+                  <div className="d-flex flex-wrap gap-1">
+                    {placeInfo.pointsOfInterest.slice(0, 5).map((point, index) => (
+                      <span key={index} className="badge bg-light text-dark border small">
+                        {point}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Indicador de carga */}
+          {loading && (
+            <div className="d-flex align-items-center mb-2">
+              <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
+                <span className="visually-hidden">Cargando...</span>
+              </div>
+              <small className="text-muted">Cargando información...</small>
+            </div>
+          )}
+          
+          {/* Mostrar error si hay */}
+          {error && (
+            <div className="alert alert-warning alert-sm mb-2">
+              <small>{error}</small>
+            </div>
+          )}
         </div>
         
         <div className="mt-auto pt-3">

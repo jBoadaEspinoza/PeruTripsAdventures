@@ -24,6 +24,16 @@ const ExtranetActivities: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showDestinationsModal, setShowDestinationsModal] = useState(false);
+  const [selectedActivityDestinations, setSelectedActivityDestinations] = useState<string[]>([]);
+  const [selectedActivityTitle, setSelectedActivityTitle] = useState('');
+
+  // Tipo para el retorno de getActivityOrigin
+  type OriginResult = string | {
+    display: string;
+    allDestinations: string[];
+    hasMore: boolean;
+  };
 
   // Fetch activities from API
   useEffect(() => {
@@ -168,11 +178,67 @@ const ExtranetActivities: React.FC = () => {
     return getTranslation('activities.duration.notSpecified', language);
   };
 
-  const getActivityOrigin = (activity: Activity) => {
+  const getActivityOrigin = (activity: Activity): OriginResult => {
     if (activity.bookingOptions && activity.bookingOptions.length > 0) {
-      return activity.bookingOptions[0].meetingPointCity ;
+      const bookingOption = activity.bookingOptions[0];
+      
+      // Si meetingType es REFERENCE_CITY_WITH_LIST, obtener destinos de pickupPoints
+      if (bookingOption.meetingType === 'REFERENCE_CITY_WITH_LIST' && bookingOption.pickupPoints && bookingOption.pickupPoints.length > 0) {
+        const uniqueCities = [...new Set(bookingOption.pickupPoints.map((pickupPoint) => pickupPoint.city.cityName))];
+        
+        if (uniqueCities.length === 1) {
+          return uniqueCities[0];
+        } else if (uniqueCities.length === 2) {
+          return `${uniqueCities[0]}, ${uniqueCities[1]}`;
+        } else {
+          // Más de 2 destinos, mostrar los primeros 2 y botón "ver más"
+          return {
+            display: `${uniqueCities[0]}, ${uniqueCities[1]}`,
+            allDestinations: uniqueCities,
+            hasMore: true
+          };
+        }
+      }
+      
+      // Caso normal: usar meetingPointCity
+      return bookingOption.meetingPointCity;
     }
     return getTranslation('activities.destination.notSpecified', language);
+  };
+
+  const getActivityDestination = (activity: Activity) => {
+    if (activity.pointsOfInterest && activity.pointsOfInterest.length > 0) {
+      // Buscar el punto de interés principal
+      const mainPOI = activity.pointsOfInterest.find(poi => poi.isMainDestination);
+      
+      if (mainPOI) {
+        return mainPOI.destinationName || mainPOI.name;
+      }
+      
+      // Si no hay principal, usar el primer punto de interés
+      const firstPOI = activity.pointsOfInterest[0];
+      return firstPOI.destinationName || firstPOI.name;
+    }
+    
+    return getTranslation('activities.destination.notSpecified', language);
+  };
+
+  const handleShowDestinations = (activity: Activity) => {
+    if (activity.bookingOptions && activity.bookingOptions.length > 0) {
+      const bookingOption = activity.bookingOptions[0];
+      if (bookingOption.meetingType === 'REFERENCE_CITY_WITH_LIST' && bookingOption.pickupPoints) {
+        const uniqueCities = [...new Set(bookingOption.pickupPoints.map((pickupPoint) => pickupPoint.city.cityName))];
+        setSelectedActivityDestinations(uniqueCities);
+        setSelectedActivityTitle(activity.title);
+        setShowDestinationsModal(true);
+      }
+    }
+  };
+
+  const handleCloseDestinationsModal = () => {
+    setShowDestinationsModal(false);
+    setSelectedActivityDestinations([]);
+    setSelectedActivityTitle('');
   };
 
   if (error) {
@@ -258,6 +324,7 @@ const ExtranetActivities: React.FC = () => {
                   </th>
                   <th className="border-0 py-3 px-4 d-none d-md-table-cell">ID</th>
                   <th className="border-0 py-3 px-4 d-none d-md-table-cell">{getTranslation('activities.table.origin', language)}</th>
+                  <th className="border-0 py-3 px-4 d-none d-md-table-cell">{getTranslation('activities.table.destination', language)}</th>
                   <th className="border-0 py-3 px-4">
                     <div className="d-flex align-items-center">
                       {getTranslation('activities.table.status', language)}
@@ -320,8 +387,35 @@ const ExtranetActivities: React.FC = () => {
                         <span className="text-muted">{activity.id}</span>
                       </td>
                       <td className="py-3 px-4 d-none d-md-table-cell">
+                        {(() => {
+                          const origin = getActivityOrigin(activity);
+                          if (typeof origin === 'object' && 'hasMore' in origin && origin.hasMore) {
+                            return (
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge bg-dark rounded-pill text-uppercase">
+                                  {origin.display}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="btn btn-link p-0 text-primary"
+                                  style={{ fontSize: '0.75rem', textDecoration: 'none' }}
+                                  onClick={() => handleShowDestinations(activity)}
+                                >
+                                  ver más
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="badge bg-dark rounded-pill text-uppercase">
+                              {String(origin)}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="py-3 px-4 d-none d-md-table-cell">
                         <span className="badge bg-dark rounded-pill text-uppercase">
-                          {getActivityOrigin(activity)}
+                          {getActivityDestination(activity)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -541,6 +635,49 @@ const ExtranetActivities: React.FC = () => {
               </li>
             </ul>
           </nav>
+        </div>
+      )}
+
+      {/* Modal de Destinos */}
+      {showDestinationsModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title">
+                  <i className="fas fa-map-marker-alt me-2 text-primary"></i>
+                  Destinos de {selectedActivityTitle}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseDestinationsModal}
+                ></button>
+              </div>
+              <div className="modal-body pt-0">
+                <div className="row g-2">
+                  {selectedActivityDestinations.map((destination, index) => (
+                    <div key={index} className="col-12">
+                      <div className="d-flex align-items-center p-2 bg-light rounded">
+                        <i className="fas fa-map-marker-alt text-primary me-2"></i>
+                        <span className="fw-semibold">{destination}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCloseDestinationsModal}
+                >
+                  <i className="fas fa-check me-2"></i>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </ExtranetPage>

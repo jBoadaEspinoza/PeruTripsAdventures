@@ -37,11 +37,6 @@ const Search: React.FC = () => {
       } catch (error) {
         console.error('Error fetching destinations:', error);
         // Fallback to static destinations if API fails
-        setDestinations([
-          { id: 2, cityName: 'paracas', countryId: 'pe', latitude: -13.834807, longitude: -76.270759, active: true, activityCount: 12 },
-          { id: 3, cityName: 'ica', countryId: 'pe', latitude: -14.083659, longitude: -75.823866, active: true, activityCount: 5 },
-          { id: 4, cityName: 'nazca', countryId: 'pe', latitude: -14.835789, longitude: -74.951864, active: true, activityCount: 4 }
-        ]);
       } finally {
         setLoadingDestinations(false);
       }
